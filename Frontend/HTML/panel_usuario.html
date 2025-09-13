@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Usuario - Biblioteca</title>
+  <link rel="stylesheet" href="../CSS/panel_usuario.css">
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div>
+      <div class="user-info">
+        <img src="https://via.placeholder.com/100" alt="Foto usuario">
+        <h3>Juan Pérez</h3>
+        <p>juanperez@mail.com</p>
+      </div>
+
+      <div class="menu">
+        <h4>Mi Panel</h4>
+        <ul>
+          <li onclick="mostrar('favoritos')">⭐ Favoritos</li>
+          <li onclick="mostrar('comprados')">📚 Comprados</li>
+          <li onclick="mostrar('carrito')">🛒 Carrito</li>
+          <li onclick="mostrar('categorias')">📂 Categorías</li>
+        </ul>
+      </div>
+    </div>
+    <p style="text-align:center; font-size:12px; color:#aaa;">© Biblioteca 2025</p>
+  </div>
+
+  <!-- Contenido principal -->
+  <div class="content">
+    <h2 id="titulo">⭐ Favoritos</h2>
+    <div class="list" id="contenido">
+      <!-- Se llena con JS -->
+    </div>
+  </div>
+
+    <script src="/JS/panel_usuario.js"></script>
+
+</body>
+</html>

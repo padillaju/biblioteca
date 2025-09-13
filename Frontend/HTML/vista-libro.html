@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Biblioteca</title>
+ <link rel="stylesheet" href="../CSS/vista-libro.css">
+
+</head>
+<body>
+  <header>
+    <h1>📚 Dashboard - Biblioteca</h1>
+  </header>
+
+  <!-- Categorías -->
+  <div class="categorias">
+    <button onclick="cargarLibros('fantasia')">Fantasía</button>
+    <button onclick="cargarLibros('ciencia')">Ciencia Ficción</button>
+    <button onclick="cargarLibros('historia')">Historia</button>
+    <button onclick="cargarLibros('romance')">Romance</button>
+  </div>
+
+  <!-- Libros -->
+  <div class="libros" id="contenedorLibros">
+    <!-- Se llena con JS -->
+  </div>
+    <script src="/JS/vista-libro.js"></script>
+
+ 
+</body>
+</html>

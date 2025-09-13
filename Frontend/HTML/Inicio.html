@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookVerse - Tu Librería Digital</title>
+    <link rel="stylesheet" href="../CSS/inicio.css">
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <nav class="container">
+            <div class="logo">BookVerse</div>
+            <ul class="nav-links">
+                <li><a href="#home">Inicio</a></li>
+                <li><a href="#libros">Libros</a></li>
+                <li><a href="#categorias">Categorías</a></li>
+                <li><a href="#ofertas">Ofertas</a></li>
+                <li><a href="#contacto">Contacto</a></li>
+            </ul>
+            <button class="cart-icon" onclick="toggleCart()">
+                🛒 Carrito
+                <span class="cart-count" id="cart-count">0</span>
+            </button>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="container">
+            <h1>Descubre Tu Próxima Aventura</h1>
+            <p>Miles de libros esperándote. Envío gratis en pedidos superiores a $50.000</p>
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="Busca tu libro favorito...">
+                <button class="search-btn" onclick="searchBooks()">🔍 Buscar</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Books Section -->
+    <section class="books-section" id="libros">
+        <div class="container">
+            <h2 class="section-title">Libros Destacados</h2>
+            <div class="books-grid" id="books-grid">
+                <!-- Los libros se generarán dinámicamente -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Cart Sidebar -->
+    <div class="cart-sidebar" id="cart-sidebar">
+        <div class="cart-header">
+            <h3>Mi Carrito</h3>
+            <button class="close-cart" onclick="toggleCart()">×</button>
+        </div>
+        <div class="cart-items" id="cart-items">
+            <p style="text-align: center; color: #666; padding: 2rem;">Tu carrito está vacío</p>
+        </div>
+        <div class="cart-total" id="cart-total">
+            Total: $0
+        </div>
+        <button class="checkout-btn" onclick="checkout()">Proceder al Pago</button>
+    </div>
+
+    <!-- Overlay -->
+    <div class="overlay" id="overlay" onclick="toggleCart()"></div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+        ¡Libro agregado al carrito!
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>Sobre Nosotros</h3>
+                    <ul>
+                        <li><a href="#">Quiénes Somos</a></li>
+                        <li><a href="#">Historia</a></li>
+                        <li><a href="#">Misión</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Servicio al Cliente</h3>
+                    <ul>
+                        <li><a href="#">Contacto</a></li>
+                        <li><a href="#">Envíos</a></li>
+                        <li><a href="#">Devoluciones</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Síguenos</h3>
+                    <ul>
+                        <li><a href="#">Facebook</a></li>
+                        <li><a href="#">Twitter</a></li>
+                        <li><a href="#">Instagram</a></li>
+                    </ul>
+                </div>
+            </div>
+            <p>&copy; 2024 BookVerse. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+</body>
+</html>
