@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BookVerse - Tu Librería Digital</title>
-    <link rel="stylesheet" href="../CSS/inicio.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../CSS/Inicio.css">
+    <link rel="stylesheet" href="../CSS/resultadoLibro.css">
+     <link rel="stylesheet" href="../CSS/sidebar.css">
+
+
 </head>
 <body>
     <!-- Header -->
@@ -18,24 +23,94 @@
                 <li><a href="#ofertas">Ofertas</a></li>
                 <li><a href="#contacto">Contacto</a></li>
             </ul>
-            <button class="cart-icon" onclick="toggleCart()">
-                🛒 Carrito
-                <span class="cart-count" id="cart-count">0</span>
+          <button class="menu-btn" onclick="toggleSidebar()">
+                <i class="fas fa-user-circle"></i> Mi Cuenta
             </button>
         </nav>
     </header>
 
+
+
+    <!-- Sidebar -->
+<div id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+        <h3>BookVerse</h3>
+        <button class="close-btn" onclick="toggleSidebar()">×</button>
+    </div>
+
+    <div class="sidebar-menu">
+       <button class="sidebar-tab active" onclick="showSection('cart')">
+    <i class="fas fa-shopping-cart"></i> Carrito (<span id="sidebar-cart-count">0</span>)
+</button>
+<button class="sidebar-tab" onclick="showSection('profile')">
+    <i class="fas fa-user"></i> Mi Perfil
+</button>
+<button class="sidebar-tab" onclick="logout()">
+    <i class="fas fa-sign-out-alt"></i> Salir
+</button>
+    </div>
+
+    <div class="sidebar-content">
+        <!-- Sección Carrito -->
+        <div id="cart-section" class="section active">
+            <h3>🛒 Tu Carrito</h3>
+            <div id="cart-items">Tu carrito está vacío.</div>
+            <button id="clear-cart-btn" onclick="clearCart()" style="display: none; margin-top: 1rem; padding: 0.6rem 1rem; background: #c0392b; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                🗑️ Vaciar carrito
+            </button>
+        </div>
+
+        <!-- Sección Perfil -->
+        <div id="profile-section" class="section">
+            <h3>👤 Mi Perfil</h3>
+            <p><strong>Nombre:</strong> Usuario Invitado</p>
+            <p><strong>Email:</strong> invitado@bookverse.com</p>
+            <p><strong>Último acceso:</strong> Hoy</p>
+            <button style="margin-top: 1rem; padding: 0.6rem 1rem; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                ✏️ Editar Perfil
+            </button>
+        </div>
+
+        <!-- Sección Salir (no necesita contenido, redirige o limpia sesión) -->
+        <div id="logout-section" class="section">
+            <!-- Vacío, se maneja con JS -->
+        </div>
+    </div>
+</div>
+
+<!-- Overlay oscuro cuando sidebar está abierto -->
+<div id="overlay" class="overlay" onclick="toggleSidebar()"></div>
+
     <!-- Hero Section -->
     <section class="hero" id="home">
-        <div class="container">
-            <h1>Descubre Tu Próxima Aventura</h1>
-            <p>Miles de libros esperándote. Envío gratis en pedidos superiores a $50.000</p>
-            <div class="search-bar">
-                <input type="text" id="search-input" placeholder="Busca tu libro favorito...">
-                <button class="search-btn" onclick="searchBooks()">🔍 Buscar</button>
+    <div class="container">
+        <h1>Descubre Tu Próxima Aventura</h1>
+        <p>Miles de libros esperándote. Envío gratis en pedidos superiores a $50.000</p>
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Busca tu libro favorito...">
+            <button class="search-btn" onclick="searchBooks()">🔍 Buscar</button>
+        </div>
+        <!-- Contenedor de tarjetas -->
+        <div id="resultado" class="books-container"></div>
+    </div>
+</section>
+
+<!-- Modal -->
+<div id="bookModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <div class="modal-body">
+            <img id="modalImage" src="" alt="Portada del libro" class="modal-image">
+            <div class="modal-info">
+                <h2 id="modalTitle"></h2>
+                <p id="modalAuthor" class="modal-author"></p>
+                <p id="modalPrice" class="modal-price"></p>
+                <p id="modalDescription" class="modal-description"></p>
+                <button class="btn modal-btn">🛒 Añadir al carrito</button>
             </div>
         </div>
-    </section>
+    </div>
+</div>
 
     <!-- Books Section -->
     <section class="books-section" id="libros">
@@ -102,6 +177,6 @@
             <p>&copy; 2024 BookVerse. Todos los derechos reservados.</p>
         </div>
     </footer>
-
+    <script src="../JS/Inicio.js"></script>
 </body>
 </html>
