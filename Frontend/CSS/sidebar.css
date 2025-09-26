@@ -158,6 +158,41 @@
     display: block;
 }
 
+
+/* perfil */
+.sidebar-profile {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+}
+
+.sidebar-profile img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.sidebar-profile .profile-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-profile .profile-name {
+    font-weight: 600;
+}
+
+.sidebar-profile .profile-email {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+
+
+
 /* Responsive */
 @media (max-width: 768px) {
     .sidebar {

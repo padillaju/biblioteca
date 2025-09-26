@@ -9,6 +9,33 @@ function toggleSidebar() {
     overlay.classList.toggle("active");
 }
 
+// perfil en sidebar
+
+function renderSidebarProfile() {
+    const profileDiv = document.getElementById("sidebar-profile");
+    const user = JSON.parse(localStorage.getItem("userSession"));
+    if (user) {
+        profileDiv.innerHTML = `
+            <img src="${user.avatar}" alt="Avatar">
+            <div class="profile-info">
+                <span class="profile-name">${user.nombre}</span>
+                <span class="profile-email">${user.email}</span>
+            </div>
+        `;
+    } else {
+        profileDiv.innerHTML = "";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    updateCartCount();
+    renderCart();
+    renderSidebarProfile(); // <-- Agrega esta línea
+});
+
+
+
+
 function showSection(sectionId) {
     // Ocultar todas las secciones
     document.querySelectorAll(".section").forEach(section => {
@@ -57,7 +84,7 @@ function addToCart(bookId, title, authors, price, imageUrl) {
 
     cart.push(newBook);
     saveCart(cart);
-    alert(`✅ "${title}" añadido al carrito.`);
+    alert(`✅"${title}" añadido al carrito.`);
 }
 
 function renderCart() {
@@ -125,7 +152,7 @@ document.addEventListener("DOMContentLoaded", function() {
 function searchBooks() {
     console.log("Buscando libros...");
     const query = document.getElementById("search-input").value;
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10`;
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1`;
 
     fetch(url)
         .then(response => response.json())
@@ -146,28 +173,37 @@ function searchBooks() {
 
                     const bookElement = document.createElement("div");
                     bookElement.classList.add("book-card");
-
-                    bookElement.innerHTML = `
-                        <img src="${imageUrl}" alt="Portada de ${title}" class="book-image">
-                        <div class="book-content">
-                            <h3 class="book-title">${title}</h3>
-                            <p class="book-author">${authors}</p>
-                            <p class="book-price">${price}</p>
-                            <div class="book-actions">
-                                <button class="btn btn-primary" onclick="openModal('${book.id}', '${title.replace(/'/g, "\\'")}', '${authors.replace(/'/g, "\\'")}', '${description.replace(/'/g, "\\'").substring(0, 200)}...', '${imageUrl}', '${price}')">Ver Detalles</button>
-                                <button class="btn btn-secondary">añadir al carrito</button>
-                            </div>
+                          bookElement.innerHTML = `
+                             <div class="book-card">
+                                <img src="${imageUrl}" alt="Portada del libro: ${title}" class="book-image" loading="lazy">
+                                  <div class="book-content">
+                                    <h3 class="book-title">${title}</h3>
+                                        <p class="book-author">por ${authors}</p>
+                                        <p class="book-price">${price}</p>
+                                     <div class="book-actions">
+                                   <button class="btn btn-primary" 
+                                  onclick="openModal('${book.id}', '${title.replace(/'/g, "\\'")}', '${authors.replace(/'/g, "\\'")}', '${description.replace(/'/g, "\\'").substring(0, 200)}...', '${imageUrl}', '${price}')"
+                                      aria-label="Ver más detalles del libro ${title}">
+                                  Ver más
+                                     </button>
+                                 <button class="btn btn-secondary" onclick="addToCart('${book.id}')" aria-label="Añadir ${title} al carrito">
+                                     Añadir
+                                 </button>
+                                 <button class="btn btn-save" onclick="saveBook('${book.id}')" aria-label="Guardar ${title} en favoritos">
+                                    Guardar
+                            </button>
                         </div>
-                    `;
-
-                    resultsContainer.appendChild(bookElement);
-                });
-            } else {
-                resultsContainer.innerHTML = '<div class="no-results">No se encontraron libros para tu búsqueda.</div>';
+                        </div>
+                    </div>
+                  `;
+                                resultsContainer.appendChild(bookElement);
+                            });
+                        } else {
+                            resultsContainer.innerHTML = '<div class="no-results">No se encontraron libros para tu búsqueda.</div>';
+                        }
+                    })
+                    .catch(error => console.error("Error al buscar libros:", error));
             }
-        })
-        .catch(error => console.error("Error al buscar libros:", error));
-}
 
 
 

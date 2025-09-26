@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Cuenta - BookVerse</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../CSS/mi-cuenta.css">
+</head>
+<body>
+     
+    <header>
+        <nav class="container">
+            <div class="logo" onclick="goToHome()">BookVerse</div>
+            <ul class="nav-links">
+                <li><a href="#" onclick="goToHome()">Inicio</a></li>
+                <li><a href="#libros">Libros</a></li>
+                <li><a href="#categorias">Categorías</a></li>
+                <li><a href="#ofertas">Ofertas</a></li>
+                <li><a href="#contacto">Contacto</a></li>
+            </ul>
+            <div class="header-actions">
+                <button class="account-btn active">
+                    <i class="fas fa-user-circle"></i> Mi Cuenta
+                </button>
+                <button class="cart-btn" onclick="showTab('cart')">
+                    <i class="fas fa-shopping-cart"></i> Carrito (<span id="header-cart-count">0</span>)
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main class="account-main">
+        <div class="container">
+            <div class="account-header">
+                <div class="profile-section">
+                    <div class="profile-avatar">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div class="profile-info">
+                        <h1 id="profile-name">Usuario Invitado</h1>
+                        <p id="profile-email">Inicia sesión para más funciones</p>
+                        <p id="profile-phone"></p>
+                        <p id="profile-address"></p>
+                        <button class="btn-secondary" onclick="editProfile()">
+                            <i class="fas fa-edit"></i> Editar Perfil
+                        </button>
+                    </div>
+                </div>
+                <div class="account-stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="cart-stat">0</div>
+                        <div class="stat-label">En Carrito</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="favorites-stat">0</div>
+                        <div class="stat-label">Favoritos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="orders-stat">0</div>
+                        <div class="stat-label">Pedidos</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="account-tabs">
+                <button class="tab-btn active" onclick="showTab('cart')">
+                    <i class="fas fa-shopping-cart"></i> Mi Carrito
+                </button>
+                <button class="tab-btn" onclick="showTab('favorites')">
+                    <i class="fas fa-heart"></i> Mis Favoritos
+                </button>
+                <button class="tab-btn" onclick="showTab('orders')">
+                    <i class="fas fa-box"></i> Mis Pedidos
+                </button>
+                <button class="tab-btn" onclick="showTab('profile')">
+                    <i class="fas fa-user"></i> Mi Perfil
+                </button>
+            </div>
+
+            <div class="tab-content">
+                <div id="cart-tab" class="tab-pane active">
+                    <div class="section-header">
+                        <h2><i class="fas fa-shopping-cart"></i> Mi Carrito</h2>
+                        <button class="btn-danger" onclick="clearCart()" id="clear-cart-btn" style="display: none;">
+                            <i class="fas fa-trash"></i> Vaciar Carrito
+                        </button>
+                    </div>
+                    <div id="cart-items" class="items-grid">
+                        <div class="empty-state">
+                            <i class="fas fa-shopping-cart"></i>
+                            <h3>Tu carrito está vacío</h3>
+                            <p>Explora nuestros libros y añade algunos a tu carrito</p>
+                            <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
+                        </div>
+                    </div>
+                    <div id="cart-summary" class="cart-summary" style="display: none;">
+                        <div class="summary-row">
+                            <span>Subtotal:</span>
+                            <span id="cart-subtotal">$0</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Envío:</span>
+                            <span id="cart-shipping">Gratis</span>
+                        </div>
+                        <div class="summary-row total">
+                            <span>Total:</span>
+                            <span id="cart-total">$0</span>
+                        </div>
+                        <button class="btn-primary checkout-btn" onclick="proceedToCheckout()">
+                            <i class="fas fa-credit-card"></i> Proceder al Pago
+                        </button>
+                    </div>
+                </div>
+
+                <div id="favorites-tab" class="tab-pane">
+                    <div class="section-header">
+                        <h2><i class="fas fa-heart"></i> Mis Favoritos</h2>
+                        <button class="btn-danger" onclick="clearFavorites()" id="clear-favorites-btn" style="display: none;">
+                            <i class="fas fa-trash"></i> Limpiar Favoritos
+                        </button>
+                    </div>
+                    <div id="favorites-items" class="items-grid">
+                        <div class="empty-state">
+                            <i class="fas fa-heart"></i>
+                            <h3>No tienes favoritos</h3>
+                            <p>Guarda libros que te interesen para encontrarlos fácilmente</p>
+                            <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="orders-tab" class="tab-pane">
+                    <div class="section-header">
+                        <h2><i class="fas fa-box"></i> Mis Pedidos</h2>
+                    </div>
+                    <div id="orders-items" class="orders-list">
+                        <div class="empty-state">
+                            <i class="fas fa-box"></i>
+                            <h3>No tienes pedidos</h3>
+                            <p>Tus pedidos aparecerán aquí una vez que realices una compra</p>
+                            <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
+                        </div>
+                    </div>
+                </div>
+
+            <!-- =========PERFIL========= -->
+
+                <div id="profile-tab" class="tab-pane">
+                    <div class="section-header">
+                        <h2><i class="fas fa-user"></i> Mi Perfil</h2>
+                    </div>
+                    <div class="profile-form">
+                        <div class="form-group">
+                            <label for="profile-name-input">Nombre Completo</label>
+                            <input type="text" id="profile-name-input" placeholder="Ingresa tu nombre">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-email-input">Correo Electrónico</label>
+                            <input type="email" id="profile-email-input" placeholder="Ingresa tu email">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-phone-input">Teléfono</label>
+                            <input type="tel" id="profile-phone-input" placeholder="Ingresa tu teléfono">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-address-input">Dirección</label>
+                            <textarea id="profile-address-input" placeholder="Ingresa tu dirección"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-photo-input">Foto de Perfil</label>
+                            <input type="file" id="profile-photo-input" accept="image/*">
+                        </div>
+
+                        <div class="form-actions">
+                            <button class="btn-primary" onclick="saveProfile()">
+                                <i class="fas fa-save"></i> Guardar Cambios
+                            </button>
+                            <button class="btn-danger" onclick="logout()">
+                                <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                            </button>
+                            
+                            
+                        </div>
+                        
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="checkout-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-credit-card"></i> Finalizar Compra</h3>
+                <span class="close" onclick="closeCheckoutModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="checkout-summary">
+                    <h4>Resumen del Pedido</h4>
+                    <div id="checkout-items"></div>
+                    <div class="checkout-total">
+                        <strong>Total: <span id="checkout-total">$0</span></strong>
+                    </div>
+                </div>
+                <div class="checkout-form">
+                    <h4>Información de Entrega</h4>
+                    <div class="form-group">
+                        <input type="text" id="checkout-name" placeholder="Nombre completo" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="email" id="checkout-email" placeholder="Correo electrónico" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="tel" id="checkout-phone" placeholder="Teléfono" required>
+                    </div>
+                    <div class="form-group">
+                        <textarea id="checkout-address" placeholder="Dirección de entrega" required></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeCheckoutModal()">Cancelar</button>
+                <button class="btn-primary" onclick="confirmOrder()">
+                    <i class="fas fa-check"></i> Confirmar Pedido
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <span id="notification-text">Notificación</span>
+    </div>
+
+    <script src="../JS/mi-cuenta.js"></script>
+</body>
+</html>

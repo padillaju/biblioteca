@@ -6,21 +6,21 @@
   <link rel="stylesheet" href="../CSS/registro.css">
 </head>
 <body>
-  <div class="titulo">
-    <h2>Registro de Usuario</h2>
+  <div class="registro-container">
+    <div class="titulo">
+      <h2>Registro de Usuario</h2>
+    </div>
+
+    <form id="formRegistro">
+      <input type="text" id="nombre" placeholder="Nombre completo" required>
+      <input type="email" id="correo" placeholder="Correo electrónico" required>
+      <input type="password" id="contrasena" placeholder="Contraseña" required>
+      <input type="text" id="celular" placeholder="Número de celular" required>
+      <input type="text" id="direccion" placeholder="Dirección completa" required>
+      <button type="submit">Registrar</button>
+      <a href="login.html">¿Ya tienes cuenta? Inicia sesión</a>
+    </form>
   </div>
-
-  <form id="formRegistro">
-
-    <input type="text" id="nombre" placeholder="Nombre" required>
-    <input type="email" id="correo" placeholder="Correo" required>
-    <input type="password" id="contrasena" placeholder="Contraseña" required>
-    <input type="text" id="celular" placeholder="Celular" required>
-    <input type="text" id="direccion" placeholder="Dirección" required>
-    <button type="submit">Registrar</button>
-    <a href="login.html">¿iniciar Sesion</a>
-  </form>
-
 
   <script src="/JS/registro.js"></script>
 </body>

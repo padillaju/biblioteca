@@ -91,18 +91,24 @@ app.post('/login', (req, res) => {
         return res.status(500).json({ success: false, message: 'Error en el servidor' });
       }
 
-      if (result.length > 0) {
-        res.json({ success: true, message: 'Inicio de sesión exitoso' });
-      } else {
-        res.json({ success: false, message: 'Correo o contraseña incorrectos' });
-      }
-    }
-  );
-});
+        if (result.length > 0) {
+            const usuario = result[0];
+            res.json({ 
+                success: true, 
+                message: 'Inicio de sesión exitoso',
+                nombre: usuario.nombre,
+                correo: usuario.correo
+            });
+        } else {
+            res.json({ success: false, message: 'Correo o contraseña incorrectos' });
+        }
+            }
+          );
+        });
 
 // Página de bienvenida
 app.get('/bienvenido', (req, res) => {
-  res.send("<h1>Bienvenido a la Biblioteca 📚</h1>");
+  res.send("<h1>Bienvenido a la Biblioteca </h1>");
 });
 
 
