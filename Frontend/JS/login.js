@@ -22,12 +22,21 @@ document.getElementById('formLogin').addEventListener('submit', async (e) => {
         email: data.correo,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}`,
         telefono: data.telefono,
-        direccion: data.direccion
+        direccion: data.direccion,
+        rol: data.rol
     }));
+
+     localStorage.setItem("isAdmin", data.rol === "admin" ? "true" : "false");
+
+
     setTimeout(() => {
-        window.location.href = "/HTML/Inicio.html";
-    }, 2000);
-}
+    if (data.rol === "admin") {
+          window.location.href = "/HTML/admin.html";
+        } else {
+          window.location.href = "/HTML/Inicio.html";
+        }
+      }, 2000);
+    }
 
   } catch (error) {
     console.error("Error:", error);
