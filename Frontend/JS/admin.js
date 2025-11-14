@@ -111,19 +111,145 @@ window.addEventListener('DOMContentLoaded', () => {
 cargarTotalUsuarios();
 
 
+// Verificación de sesión al cargar la página (protección contra navegación hacia atrás)
+async function verifySessionOnLoad() {
+    try {
+        const response = await fetch("http://localhost:3000/check-session?" + Date.now(), {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        });
+        
+        const data = await response.json();
+        
+        // Verificar si el usuario es administrador
+        const isAdmin = localStorage.getItem("isAdmin") === "true";
+        
+        // Si no hay sesión activa o no es administrador, redirigir inmediatamente
+        if (!data.success || !data.isAuthenticated || !isAdmin) {
+            // Limpiar localStorage
+            localStorage.removeItem("userSession");
+            localStorage.removeItem("isAdmin");
+            
+            // Redirigir al login sin permitir volver atrás
+            window.history.replaceState(null, "", "login.html?session=expired&nocache=" + Date.now());
+            window.location.replace("login.html?session=expired&nocache=" + Date.now());
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error("Error al verificar sesión:", error);
+        // En caso de error, redirigir por seguridad
+        window.history.replaceState(null, "", "login.html?error=connection&nocache=" + Date.now());
+        window.location.replace("login.html?error=connection&nocache=" + Date.now());
+        return false;
+    }
+}
+
+// Prevenir navegación hacia atrás después del logout
+function preventBackNavigation() {
+    // Reemplazar el historial actual para que no se pueda volver atrás
+    window.history.replaceState(null, "", window.location.href);
+    
+    // Agregar listener para detectar cuando el usuario intenta ir atrás
+    window.addEventListener('popstate', function(event) {
+        // Verificar sesión cuando se detecta navegación hacia atrás
+        verifySessionOnLoad().then(isAuthenticated => {
+            if (!isAuthenticated) {
+                // Si no hay sesión, prevenir la navegación
+                event.preventDefault();
+                // Forzar redirección al login
+                window.history.pushState(null, "", "login.html?back=prevented&nocache=" + Date.now());
+                window.location.replace("login.html?back=prevented&nocache=" + Date.now());
+            }
+        });
+        
+        // Siempre verificar sesión cuando se detecta popstate
+        fetch("http://localhost:3000/check-session?" + Date.now(), {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store"
+        })
+        .then(response => response.json())
+        .then(data => {
+            const isAdmin = localStorage.getItem("isAdmin") === "true";
+            if (!data.success || !data.isAuthenticated || !isAdmin) {
+                // Si no hay sesión o no es admin, redirigir inmediatamente
+                window.history.pushState(null, "", "login.html?session=expired&nocache=" + Date.now());
+                window.location.replace("login.html?session=expired&nocache=" + Date.now());
+            }
+        })
+        .catch(error => {
+            console.error("Error al verificar sesión en popstate:", error);
+            window.location.replace("login.html?error=connection&nocache=" + Date.now());
+        });
+    });
+    
+    // Agregar entrada adicional al historial para prevenir navegación hacia atrás
+    window.history.pushState(null, "", window.location.href);
+}
+
 // Inicialización del panel de administrador
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  // Verificar sesión ANTES de inicializar cualquier cosa
+  const isAuthenticated = await verifySessionOnLoad();
+  
+  if (!isAuthenticated) {
+    // Si no hay sesión, no continuar con la inicialización
+    return;
+  }
+  
+  // Prevenir navegación hacia atrás
+  preventBackNavigation();
+  
   initializeAdmin()
   loadDashboardData()
   setupEventListeners()
+  
+  // Verificación periódica de sesión (cada 30 segundos) para prevenir acceso después del logout
+  setInterval(async () => {
+    try {
+      const response = await fetch("http://localhost:3000/check-session?" + Date.now(), {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        }
+      });
+      
+      const data = await response.json();
+      const isAdmin = localStorage.getItem("isAdmin") === "true";
+      
+      // Si la sesión expiró o no es admin, redirigir inmediatamente
+      if (!data.success || !data.isAuthenticated || !isAdmin) {
+        localStorage.removeItem("userSession");
+        localStorage.removeItem("isAdmin");
+        window.history.replaceState(null, "", "login.html?session=expired&nocache=" + Date.now());
+        window.location.replace("login.html?session=expired&nocache=" + Date.now());
+      }
+    } catch (error) {
+      console.error("Error en verificación periódica de sesión:", error);
+      // No redirigir en caso de error de conexión, solo loguear
+    }
+  }, 30000); // Verificar cada 30 segundos
 })
 
 function initializeAdmin() {
-  // Verificar si el usuario es administrador (simulado)
+  // Verificar si el usuario es administrador (ya verificado en verifySessionOnLoad)
   const isAdmin = localStorage.getItem("isAdmin") === "true"
   if (!isAdmin) {
     // Redirigir al login si no es administrador
-    window.location.href = "login.html"
+    window.history.replaceState(null, "", "login.html?admin=required&nocache=" + Date.now());
+    window.location.replace("login.html?admin=required&nocache=" + Date.now());
     return
   }
 
@@ -683,10 +809,166 @@ function saveShippingSettings(e) {
 }
 
 function logout() {
-  if (confirm("¿Estás seguro de que quieres cerrar sesión?")) {
-    localStorage.removeItem("isAdmin")
-    window.location.href = "login.html"
+  // Confirmación más visible y segura para admin
+  const confirmMessage = "⚠️ ¿ESTÁS SEGURO DE QUE QUIERES CERRAR SESIÓN DE ADMINISTRADOR?\n\n" +
+                        "Esta acción cerrará tu sesión de administrador de forma permanente.\n" +
+                        "Todos los datos locales se eliminarán.\n\n" +
+                        "Presiona 'Aceptar' para continuar o 'Cancelar' para permanecer conectado.";
+  
+  if (!confirm(confirmMessage)) {
+    return; // El usuario canceló
   }
+  
+  // Deshabilitar el botón
+  const logoutBtn = document.querySelector('.logout-btn');
+  if (logoutBtn) {
+    logoutBtn.disabled = true;
+    logoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cerrando sesión...';
+  }
+  
+  // Función para limpiar todos los datos del cliente
+  function clearAllClientData() {
+    try {
+      // Limpiar localStorage completamente
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Limpiar sessionStorage
+      try {
+        sessionStorage.clear();
+      } catch (e) {
+        console.warn("Error al limpiar sessionStorage:", e);
+      }
+      
+      // Limpiar cookies del cliente
+      document.cookie.split(";").forEach(function(c) {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+    } catch (error) {
+      console.error("Error al limpiar datos del cliente:", error);
+    }
+  }
+  
+  // Verificar sesión antes de cerrar (con headers anti-caché)
+  fetch("http://localhost:3000/check-session?" + Date.now(), {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    }
+  })
+  .then(response => response.json())
+  .then(sessionData => {
+    // Llamar al endpoint del backend para cerrar sesión de forma segura
+    return fetch("http://localhost:3000/logout?" + Date.now(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      },
+      credentials: "include",
+      cache: "no-store",
+      referrerPolicy: "no-referrer"
+    });
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (data.success) {
+      clearAllClientData();
+      
+      // Verificar que la sesión se cerró correctamente (sin caché)
+      return fetch("http://localhost:3000/check-session?" + Date.now(), {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        }
+      })
+      .then(response => response.json())
+      .then(verifyData => {
+        if (!verifyData.isAuthenticated) {
+          showNotification("✅ Sesión de administrador cerrada de forma segura", "success");
+          
+          // Limpiar caché antes de redirigir
+          if ('caches' in window) {
+            caches.keys().then(names => {
+              names.forEach(name => {
+                caches.delete(name);
+              });
+            });
+          }
+          
+          // Eliminar completamente la entrada del historial
+          window.history.pushState(null, "", "login.html?logout=success&nocache=" + Date.now());
+          window.history.replaceState(null, "", "login.html?logout=success&nocache=" + Date.now());
+          
+          setTimeout(() => {
+            window.location.replace("login.html?logout=success&nocache=" + Date.now());
+            // Forzar recarga completa sin caché
+            setTimeout(() => {
+              window.location.href = "login.html?logout=success&nocache=" + Date.now();
+            }, 100);
+          }, 1000);
+        } else {
+          clearAllClientData();
+          showNotification("⚠️ Cerrando sesión localmente...", "warning");
+          
+          // Limpiar caché antes de redirigir
+          if ('caches' in window) {
+            caches.keys().then(names => {
+              names.forEach(name => {
+                caches.delete(name);
+              });
+            });
+          }
+          
+          setTimeout(() => {
+            window.location.replace("login.html?logout=local&nocache=" + Date.now());
+          }, 1000);
+        }
+      });
+    } else {
+      throw new Error(data.message || "Error al cerrar sesión");
+    }
+  })
+  .catch(error => {
+    console.error("Error al cerrar sesión:", error);
+    clearAllClientData();
+    showNotification("⚠️ Sesión cerrada localmente (verifica la conexión)", "warning");
+    
+    // Limpiar caché antes de redirigir
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => {
+          caches.delete(name);
+        });
+      });
+    }
+    
+    setTimeout(() => {
+      window.location.replace("login.html?logout=local&error=connection&nocache=" + Date.now());
+    }, 1500);
+  });
 }
 
 // Agregar estilos CSS para las animaciones de notificación

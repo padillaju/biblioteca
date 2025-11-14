@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Meta tags para prevenir caché después del logout -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>BookVerse - Tu Librería Digital</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -24,9 +28,17 @@
                 <li><a href="#ofertas">Ofertas</a></li>
                 <li><a href="#contacto">Contacto</a></li>
             </ul>
-          <a href="mi-cuenta.html" class="menu-btn" >
+            <div class="header-actions">
+                <a href="mi-cuenta.html" class="menu-btn" id="account-btn">
                 <i class="fas fa-user-circle"></i> Mi Cuenta
             </a>
+                <button id="logout-btn" class="logout-btn" onclick="logout()" style="display: none;" title="Cerrar sesión de forma segura">
+                    <i class="fas fa-sign-out-alt"></i> <span>CERRAR SESIÓN</span>
+                </button>
+                <a href="login.html" id="login-btn" class="menu-btn" style="display: none;">
+                    <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                </a>
+            </div>
         </nav>
     </header>
 
@@ -78,7 +90,7 @@
     </div>
 </section>
 
-<!-- Modal -->
+<!-- Modal de Libro -->
 <div id="bookModal" class="modal">
     <div class="modal-content">
         <span class="close">&times;</span>
@@ -91,6 +103,56 @@
                 <p id="modalDescription" class="modal-description"></p>
                 <button class="btn modal-btn">🛒 Añadir al carrito</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación de Logout Seguro -->
+<div id="logoutModal" class="logout-modal">
+    <div class="logout-modal-content">
+        <div class="logout-modal-header">
+            <div class="security-icon">🔒</div>
+            <h2>Cerrar Sesión de Forma Segura</h2>
+            <button class="logout-close-btn" onclick="closeLogoutModal()">&times;</button>
+        </div>
+        <div class="logout-modal-body">
+            <div class="security-warning">
+                <div class="warning-icon">⚠️</div>
+                <h3>¿Estás seguro de que quieres cerrar sesión?</h3>
+            </div>
+            <div class="security-info">
+                <div class="info-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Tu sesión será cerrada de forma permanente</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Todos los datos locales se eliminarán</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Las cookies de sesión serán limpiadas</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Proceso verificado y seguro</span>
+                </div>
+            </div>
+            <div class="security-timer" id="security-timer" style="display: none;">
+                <i class="fas fa-clock"></i>
+                <span>Procesando cierre de sesión seguro...</span>
+                <div class="timer-bar">
+                    <div class="timer-progress" id="timer-progress"></div>
+                </div>
+            </div>
+        </div>
+        <div class="logout-modal-footer">
+            <button class="logout-cancel-btn" onclick="closeLogoutModal()">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button class="logout-confirm-btn" id="confirm-logout-btn" onclick="confirmSecureLogout()">
+                <i class="fas fa-sign-out-alt"></i> Confirmar Cierre de Sesión
+            </button>
         </div>
     </div>
 </div>

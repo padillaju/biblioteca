@@ -11,6 +11,19 @@ const PORT = 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Middleware para prevenir caché en respuestas de autenticación
+function setNoCacheHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  // Prevenir caché en navegadores y proxies
+  res.setHeader('Clear-Site-Data', '"cache", "cookies", "storage"');
+}
+
 
 
 const cors = require('cors');
@@ -41,7 +54,7 @@ app.use(session({
 const db = mysql.createPool({
   host: 'localhost',
   user: 'root',       
-  password: 'root',   
+  password: '1234',   
   database: 'TiendaLibro'
 });
 
@@ -101,24 +114,35 @@ app.post('/registro', (req, res) => {
 });
 
 app.get('/login.html', (req, res) => {
+  // Prevenir caché en la página de login
+  setNoCacheHeaders(res);
   res.sendFile(path.join(__dirname, 'Frontend', 'HTML', 'login.html'));
 });
 
 // Login
 app.post('/login', (req, res) => {
+  // Prevenir caché en respuestas de login
+  setNoCacheHeaders(res);
+  
   const { correo, contrasena } = req.body;
 
   db.query(
     'SELECT * FROM usuario WHERE correo = ? AND contrasena = ?',
     [correo, contrasena],
     (err, result) => {
-      if (err) return res.status(500).json({ success: false, message: 'Error en el servidor' });
+      if (err) {
+        setNoCacheHeaders(res);
+        return res.status(500).json({ success: false, message: 'Error en el servidor' });
+      }
 
       if (result.length > 0) {
         const usuario = result[0];
 
         // Guardar ID del usuario en sesión
         req.session.id_usuario = usuario.id_usuario;
+
+        // Asegurar headers anti-caché antes de enviar respuesta exitosa
+        setNoCacheHeaders(res);
 
         res.json({ 
           success: true, 
@@ -128,10 +152,102 @@ app.post('/login', (req, res) => {
           rol: usuario.rol
         });
       } else {
+        setNoCacheHeaders(res);
         res.json({ success: false, message: 'Correo o contraseña incorrectos' });
       }
     }
   );
+  });
+
+// Logout - Cerrar sesión de forma segura
+app.post('/logout', (req, res) => {
+  const sessionId = req.sessionID;
+  const userId = req.session.id_usuario;
+  const userIp = req.ip || req.connection.remoteAddress;
+  
+  // Log de seguridad
+  console.log(`[LOGOUT] Intento de cierre de sesión - Usuario ID: ${userId}, Sesión ID: ${sessionId}, IP: ${userIp}, Timestamp: ${new Date().toISOString()}`);
+  
+  // Prevenir caché en todas las respuestas de logout
+  setNoCacheHeaders(res);
+  
+  // Verificar que existe una sesión
+  if (!req.session.id_usuario) {
+    console.warn(`[LOGOUT] Intento de cerrar sesión sin sesión activa - IP: ${userIp}`);
+    return res.status(401).json({ 
+      success: false, 
+      message: 'No hay sesión activa para cerrar' 
+    });
+  }
+  
+  // Destruir la sesión de forma segura
+  req.session.destroy((err) => {
+    if (err) {
+      console.error(`[LOGOUT ERROR] Error al destruir sesión - Usuario ID: ${userId}, Error: ${err.message}`);
+      setNoCacheHeaders(res);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Error al cerrar sesión' 
+      });
+    }
+    
+    // Limpiar todas las cookies relacionadas con la sesión
+    const cookieOptions = {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Solo en producción con HTTPS
+      sameSite: 'lax',
+      maxAge: 0 // Expirar inmediatamente
+    };
+    
+    // Limpiar cookie de sesión con diferentes nombres posibles
+    res.clearCookie('connect.sid', cookieOptions);
+    res.clearCookie('sessionId', cookieOptions);
+    res.clearCookie('session', cookieOptions);
+    
+    // Limpiar cualquier cookie relacionada
+    if (req.headers.cookie) {
+      req.headers.cookie.split(';').forEach(cookie => {
+        const name = cookie.split('=')[0].trim();
+        if (name.includes('session') || name.includes('sid')) {
+          res.clearCookie(name, cookieOptions);
+        }
+      });
+    }
+    
+    // Log de éxito
+    console.log(`[LOGOUT SUCCESS] Sesión cerrada correctamente - Usuario ID: ${userId}, Sesión ID: ${sessionId}, IP: ${userIp}`);
+    
+    // Headers de seguridad y anti-caché estrictos
+    setNoCacheHeaders(res);
+    // Header adicional para limpiar datos del sitio (solo en navegadores compatibles)
+    res.setHeader('Clear-Site-Data', '"cache", "cookies", "storage", "executionContexts"');
+    
+    res.json({ 
+      success: true, 
+      message: 'Sesión cerrada correctamente',
+      timestamp: new Date().toISOString()
+    });
+  });
+});
+
+// Verificar sesión
+app.get('/check-session', (req, res) => {
+  // Prevenir caché en verificaciones de sesión
+  setNoCacheHeaders(res);
+  
+  if (req.session.id_usuario) {
+    res.json({ 
+      success: true, 
+      isAuthenticated: true, 
+      id_usuario: req.session.id_usuario 
+    });
+  } else {
+    res.json({ 
+      success: false, 
+      isAuthenticated: false 
+    });
+  }
   });
 
 
