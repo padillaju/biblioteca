@@ -55,7 +55,7 @@ db.getConnection((err, connection) => {
   if (err) {
     console.error("Error al conectar con la base de datos:", err);
   } else {
-    console.log("✅ Conectado a la base de datos");
+    console.log(" Conectado a la base de datos");
     connection.release(); // devolvemos la conexión al pool
   }
 });
@@ -75,8 +75,8 @@ CREATE TABLE IF NOT EXISTS libros (
 
 // Crear la tabla si no existe
 db.promise().query(createLibrosTable)
-  .then(() => console.log('✅ Tabla `libros` verificada/creada'))
-  .catch(err => console.error('Error creando/verificando tabla libros:', err));
+  // .then(() => console.log('✅ Tabla `libros` verificada/creada'))
+  // .catch(err => console.error('Error creando/verificando tabla libros:', err));
 
 // Crear tabla `usuario` si no existe (útil en entornos de desarrollo)
 const createUsuarioTable = `
@@ -94,13 +94,13 @@ CREATE TABLE IF NOT EXISTS usuario (
 `;
 
 db.promise().query(createUsuarioTable)
-  .then(() => console.log('✅ Tabla `usuario` verificada/creada'))
+  // .then(() => console.log('✅ Tabla `usuario` verificada/creada'))
   .catch(err => console.error('Error creando/verificando tabla usuario:', err));
 
 // Si la tabla ya existía con la columna `image` corta, intentar modificarla a MEDIUMTEXT.
 // Esto permite almacenar data URLs/base64 largos sin fallar con ER_DATA_TOO_LONG.
 db.promise().query("ALTER TABLE libros MODIFY COLUMN image MEDIUMTEXT")
-  .then(() => console.log('✅ Columna `image` en `libros` asegurada como MEDIUMTEXT'))
+  // .then(() => console.log('✅ Columna `image` en `libros` asegurada como MEDIUMTEXT'))
   .catch(err => {
     // Ignorar errores comunes (por ejemplo si la tabla no existe aún o la columna ya tiene el tipo correcto)
     if (err && err.code !== 'ER_NO_SUCH_TABLE' && err.errno !== 1146) {
@@ -214,7 +214,7 @@ db.promise().query("SHOW COLUMNS FROM usuario LIKE 'avatar'")
         .then(() => console.log('✅ Columna `avatar` en `usuario` creada como MEDIUMTEXT'))
         .catch(err => console.error('Error al crear la columna avatar en usuario:', err));
     } else {
-      console.log('✅ Columna `avatar` ya existe en `usuario`');
+      // console.log('✅ Columna `avatar` ya existe en `usuario`');
       return null;
     }
   })
@@ -678,22 +678,46 @@ app.get("/mis-pedidos", async (req, res) => {
   });
 
   // Eliminar un usuario por ID
-app.delete('/usuario/:id', (req, res) => {
-    const id = req.params.id;
+app.delete('/usuario/:id', async (req, res) => {
+  const id = req.params.id;
 
-    const sql = 'DELETE FROM usuario WHERE id_usuario = ?';
-    db.query(sql, [id], (err, result) => {
-        if (err) {
-            console.error('Error al eliminar usuario:', err);
-            return res.status(500).json({ success: false, message: 'Error al eliminar usuario' });
-        }
+  // Ejecutar en transacción: borrar items del carrito, carrito y luego usuario.
+  const connection = await db.promise().getConnection();
+  try {
+    await connection.beginTransaction();
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-        }
+    // Eliminar items vinculados al carrito del usuario (si existen)
+    await connection.query(
+      `DELETE ci FROM carrito_items ci
+       JOIN carrito c ON ci.id_carrito = c.id_carrito
+       WHERE c.id_usuario = ?`,
+      [id]
+    );
 
-        res.json({ success: true, message: 'Usuario eliminado correctamente' });
-    });
+    // Eliminar carritos del usuario
+    await connection.query(
+      `DELETE FROM carrito WHERE id_usuario = ?`,
+      [id]
+    );
+
+    // Finalmente eliminar el usuario
+    const [result] = await connection.query(`DELETE FROM usuario WHERE id_usuario = ?`, [id]);
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+
+    await connection.commit();
+    connection.release();
+    res.json({ success: true, message: 'Usuario eliminado correctamente' });
+  } catch (err) {
+    try { await connection.rollback(); } catch (e) { /* ignore rollback error */ }
+    connection.release();
+    console.error('Error al eliminar usuario (transacción):', err);
+    return res.status(500).json({ success: false, message: 'Error al eliminar usuario', error: err.sqlMessage || err.message });
+  }
 });
 
 

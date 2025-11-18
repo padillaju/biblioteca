@@ -686,13 +686,16 @@ nav {
 }
 
 .modal-content {
-    width: 100%;
-    max-width: 520px;
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 12px 40px rgba(31,38,135,0.25);
-    overflow: hidden;
-    animation: modalIn 180ms ease-out;
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(31,38,135,0.25);
+  /* limitar la altura total del modal para que no ocupe toda la pantalla */
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  animation: modalIn 180ms ease-out;
 }
 
 @keyframes modalIn {
@@ -704,7 +707,7 @@ nav {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 20px;
+    padding: 18px 30px;
     background: linear-gradient(45deg, #667eea, #764ba2);
     color: #fff;
 }
@@ -721,18 +724,22 @@ nav {
 }
 
 .modal-body {
-    padding: 20px;
-    color: #333;
-    font-size: 0.98rem;
-    line-height: 1.5;
+  padding: 20px;
+  color: #333;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  /* permitir que el contenido interno haga scroll si excede la altura máxima */
+  overflow: auto;
 }
 
 .modal-footer {
-    padding: 14px 18px;
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    background: #fafafa;
+  padding: 14px 18px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  background: #fafafa;
+  /* aseguramos que el footer no se quede fuera al hacer scroll */
+  flex: 0 0 auto;
 }
 
 .modal .btn-secondary {

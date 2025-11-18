@@ -33,6 +33,68 @@ function showTab(tabName) {
 }
 
 // Funciones del carrito
+// Confirmación no bloqueante usando un "toast" con botones
+function confirmWithToast(message, onConfirm, onCancel) {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'confirm-toast-wrapper'
+  wrapper.style.position = 'fixed'
+  wrapper.style.left = '50%'
+  wrapper.style.bottom = '24px'
+  wrapper.style.transform = 'translateX(-50%)'
+  wrapper.style.zIndex = 9999
+  wrapper.style.background = '#fff'
+  wrapper.style.border = '1px solid rgba(0,0,0,0.08)'
+  wrapper.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)'
+  wrapper.style.padding = '12px 14px'
+  wrapper.style.borderRadius = '10px'
+  wrapper.style.display = 'flex'
+  wrapper.style.alignItems = 'center'
+  wrapper.style.gap = '12px'
+
+  const msg = document.createElement('div')
+  msg.textContent = message
+  msg.style.color = '#222'
+  msg.style.fontSize = '14px'
+
+  const btnConfirm = document.createElement('button')
+  btnConfirm.textContent = 'Confirmar'
+  btnConfirm.style.background = '#6B00FF'
+  btnConfirm.style.color = '#fff'
+  btnConfirm.style.border = 'none'
+  btnConfirm.style.padding = '8px 10px'
+  btnConfirm.style.borderRadius = '8px'
+  btnConfirm.style.cursor = 'pointer'
+
+  const btnCancel = document.createElement('button')
+  btnCancel.textContent = 'Cancelar'
+  btnCancel.style.background = '#eee'
+  btnCancel.style.color = '#333'
+  btnCancel.style.border = 'none'
+  btnCancel.style.padding = '8px 10px'
+  btnCancel.style.borderRadius = '8px'
+  btnCancel.style.cursor = 'pointer'
+
+  wrapper.appendChild(msg)
+  wrapper.appendChild(btnConfirm)
+  wrapper.appendChild(btnCancel)
+
+  document.body.appendChild(wrapper)
+
+  const cleanup = () => { if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper) }
+
+  btnConfirm.addEventListener('click', () => {
+    try { onConfirm && onConfirm() } catch (e) { console.error('confirmWithToast onConfirm error', e) }
+    cleanup()
+  })
+
+  btnCancel.addEventListener('click', () => {
+    try { onCancel && onCancel() } catch (e) { /* ignore */ }
+    cleanup()
+  })
+
+  const timeout = setTimeout(() => { cleanup(); if (onCancel) onCancel() }, 10000)
+  [btnConfirm, btnCancel].forEach(b => b.addEventListener('click', () => clearTimeout(timeout)))
+}
 function updateCartDisplay() {
   const cartItemsContainer = document.getElementById("cart-items")
   const emptyCart = document.getElementById("empty-cart")
@@ -126,13 +188,15 @@ function clearCart() {
     return
   }
 
-  if (confirm("¿Estás seguro de que quieres vaciar el carrito?")) {
+  confirmWithToast('¿Estás seguro de que quieres vaciar el carrito?', () => {
     cart = []
     saveCart()
     updateCartDisplay()
     updateCounts()
-    showNotification("Carrito vaciado", "success")
-  }
+    showNotification('Carrito vaciado', 'success')
+  }, () => {
+    showNotification('Acción cancelada', 'info')
+  })
 }
 
 function saveCart() {
@@ -214,13 +278,15 @@ function clearFavorites() {
     return
   }
 
-  if (confirm("¿Estás seguro de que quieres limpiar todos los favoritos?")) {
+  confirmWithToast('¿Estás seguro de que quieres limpiar todos los favoritos?', () => {
     favorites = []
     saveFavorites()
     updateFavoritesDisplay()
     updateCounts()
-    showNotification("Favoritos limpiados", "success")
-  }
+    showNotification('Favoritos limpiados', 'success')
+  }, () => {
+    showNotification('Acción cancelada', 'info')
+  })
 }
 
 function saveFavorites() {

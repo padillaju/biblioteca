@@ -1,4 +1,68 @@
 console.log('admin.js loaded');
+// Asegurar que `confirmWithToast` exista en el ámbito global para evitar ReferenceError
+if (typeof confirmWithToast !== 'function') {
+  window.confirmWithToast = function(message, onConfirm, onCancel) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'confirm-toast-wrapper';
+    wrapper.style.position = 'fixed';
+    wrapper.style.left = '50%';
+    wrapper.style.bottom = '24px';
+    wrapper.style.transform = 'translateX(-50%)';
+    wrapper.style.zIndex = 9999;
+    wrapper.style.background = '#fff';
+    wrapper.style.border = '1px solid rgba(0,0,0,0.08)';
+    wrapper.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+    wrapper.style.padding = '12px 14px';
+    wrapper.style.borderRadius = '10px';
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '12px';
+
+    const msg = document.createElement('div');
+    msg.textContent = message;
+    msg.style.color = '#222';
+    msg.style.fontSize = '14px';
+
+    const btnConfirm = document.createElement('button');
+    btnConfirm.textContent = 'Confirmar';
+    btnConfirm.style.background = '#6B00FF';
+    btnConfirm.style.color = '#fff';
+    btnConfirm.style.border = 'none';
+    btnConfirm.style.padding = '8px 10px';
+    btnConfirm.style.borderRadius = '8px';
+    btnConfirm.style.cursor = 'pointer';
+
+    const btnCancel = document.createElement('button');
+    btnCancel.textContent = 'Cancelar';
+    btnCancel.style.background = '#eee';
+    btnCancel.style.color = '#333';
+    btnCancel.style.border = 'none';
+    btnCancel.style.padding = '8px 10px';
+    btnCancel.style.borderRadius = '8px';
+    btnCancel.style.cursor = 'pointer';
+
+    wrapper.appendChild(msg);
+    wrapper.appendChild(btnConfirm);
+    wrapper.appendChild(btnCancel);
+
+    document.body.appendChild(wrapper);
+
+    const cleanup = () => { if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper); };
+
+    btnConfirm.addEventListener('click', () => {
+      try { onConfirm && onConfirm(); } catch (e) { console.error('confirmWithToast onConfirm error', e); }
+      cleanup();
+    });
+
+    btnCancel.addEventListener('click', () => {
+      try { onCancel && onCancel(); } catch (e) { /* ignore */ }
+      cleanup();
+    });
+
+    const timeout = setTimeout(() => { cleanup(); if (onCancel) onCancel(); }, 10000);
+    [btnConfirm, btnCancel].forEach(b => b.addEventListener('click', () => clearTimeout(timeout)));
+  };
+}
 document.addEventListener('DOMContentLoaded', () => {
   initSidebar();
   attachModalHandlers();
@@ -23,6 +87,69 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch (e) {
     console.warn('No sales chart available or error initializing it', e);
   }
+
+// Confirmación no bloqueante local para admin (usa su propio DOM, independiente de showToast)
+function confirmWithToast(message, onConfirm, onCancel) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'confirm-toast-wrapper';
+  wrapper.style.position = 'fixed';
+  wrapper.style.left = '50%';
+  wrapper.style.bottom = '24px';
+  wrapper.style.transform = 'translateX(-50%)';
+  wrapper.style.zIndex = 9999;
+  wrapper.style.background = '#fff';
+  wrapper.style.border = '1px solid rgba(0,0,0,0.08)';
+  wrapper.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+  wrapper.style.padding = '12px 14px';
+  wrapper.style.borderRadius = '10px';
+  wrapper.style.display = 'flex';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.gap = '12px';
+
+  const msg = document.createElement('div');
+  msg.textContent = message;
+  msg.style.color = '#222';
+  msg.style.fontSize = '14px';
+
+  const btnConfirm = document.createElement('button');
+  btnConfirm.textContent = 'Confirmar';
+  btnConfirm.style.background = '#6B00FF';
+  btnConfirm.style.color = '#fff';
+  btnConfirm.style.border = 'none';
+  btnConfirm.style.padding = '8px 10px';
+  btnConfirm.style.borderRadius = '8px';
+  btnConfirm.style.cursor = 'pointer';
+
+  const btnCancel = document.createElement('button');
+  btnCancel.textContent = 'Cancelar';
+  btnCancel.style.background = '#eee';
+  btnCancel.style.color = '#333';
+  btnCancel.style.border = 'none';
+  btnCancel.style.padding = '8px 10px';
+  btnCancel.style.borderRadius = '8px';
+  btnCancel.style.cursor = 'pointer';
+
+  wrapper.appendChild(msg);
+  wrapper.appendChild(btnConfirm);
+  wrapper.appendChild(btnCancel);
+
+  document.body.appendChild(wrapper);
+
+  const cleanup = () => { if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper); };
+
+  btnConfirm.addEventListener('click', () => {
+    try { onConfirm && onConfirm(); } catch (e) { console.error('confirmWithToast onConfirm error', e); }
+    cleanup();
+  });
+
+  btnCancel.addEventListener('click', () => {
+    try { onCancel && onCancel(); } catch (e) { /* ignore */ }
+    cleanup();
+  });
+
+  const timeout = setTimeout(() => { cleanup(); if (onCancel) onCancel(); }, 10000);
+  [btnConfirm, btnCancel].forEach(b => b.addEventListener('click', () => clearTimeout(timeout)));
+}
 
 // -------- barra de gráfico (semana / mes / año) ----------------
 async function renderSalesChart(period = 'month', openModal = false) {
@@ -82,7 +209,8 @@ async function renderSalesChart(period = 'month', openModal = false) {
     node.addEventListener('click', () => {
       const lbl = node.dataset.label;
       const amount = Number(node.dataset.amount || 0);
-      alert(`${lbl} — $${amount.toFixed(2)}`);
+      const msg = `${lbl} — $${amount.toFixed(2)}`;
+      try { showToast(msg, 'info') } catch (e) { alert(msg) }
     });
   });
 
@@ -138,7 +266,8 @@ function renderSalesChartFromArray(pedidosArray, period = 'month') {
     node.addEventListener('click', () => {
       const lbl = node.dataset.label;
       const amount = Number(node.dataset.amount || 0);
-      alert(`${lbl} — $${amount.toFixed(2)}`);
+      const msg = `${lbl} — $${amount.toFixed(2)}`;
+      try { showToast(msg, 'info') } catch (e) { alert(msg) }
     });
   });
 }
@@ -346,7 +475,7 @@ async function applyOrderDateFilter() {
     if (startEl && startEl.value) start = new Date(startEl.value);
     if (endEl && endEl.value) end = new Date(endEl.value);
     if (start && end && start > end) {
-      alert('La fecha de inicio no puede ser posterior a la fecha final.');
+      try { showToast('La fecha de inicio no puede ser posterior a la fecha final.', 'warning') } catch (e) { alert('La fecha de inicio no puede ser posterior a la fecha final.') }
       return;
     }
   } else if (mode === 'today') {
@@ -528,9 +657,7 @@ function renderUsers(users) {
     `;
 
     tr.querySelector('[data-action="delete"]').addEventListener('click', () => {
-      if (confirm(`Eliminar usuario ${u.nombre} (ID ${u.id_usuario})?`)) {
-        deleteUser(u.id_usuario);
-      }
+      confirmWithToast(`Eliminar usuario ${u.nombre} (ID ${u.id_usuario})?`, () => deleteUser(u.id_usuario));
     });
 
     tbody.appendChild(tr);
@@ -540,9 +667,10 @@ function renderUsers(users) {
 async function deleteUser(id) {
   try {
     const res = await fetch(`/usuario/${id}`, { method: 'DELETE' });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!data || !data.success) {
-      alert('No se pudo eliminar el usuario');
+      const msg = (data && data.message) ? data.message : 'No se pudo eliminar el usuario';
+      try { showToast(msg, 'error') } catch (e) { alert(msg) }
       console.error('Respuesta eliminar usuario:', data);
       return;
     }
@@ -553,7 +681,7 @@ async function deleteUser(id) {
     // nada más por ahora
   } catch (err) {
     console.error('Error eliminando usuario:', err);
-    alert('Error eliminando usuario');
+    try { showToast('Error eliminando usuario', 'error') } catch (e) { alert('Error eliminando usuario') }
   }
 }
 
@@ -853,13 +981,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const data = await res.json();
         if (res.ok && data && data.success) {
-          alert('Libro actualizado correctamente');
+          try { showToast('Libro actualizado correctamente', 'success') } catch (e) { alert('Libro actualizado correctamente') }
           closeAddBookModal();
           await loadFeaturedBooks();
           return;
         } else {
           console.error('Error al actualizar libro:', data);
-          alert('No se pudo actualizar el libro en el servidor');
+          try { showToast('No se pudo actualizar el libro en el servidor', 'warning') } catch (e) { alert('No se pudo actualizar el libro en el servidor') }
           return;
         }
       }
@@ -873,16 +1001,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const data = await res.json();
       if (res.ok && data && data.success) {
-        alert('Libro agregado correctamente');
+        try { showToast('Libro agregado correctamente', 'success') } catch (e) { alert('Libro agregado correctamente') }
         closeAddBookModal();
         await loadFeaturedBooks();
       } else {
         console.error('Error al agregar libro:', data);
-        alert('No se pudo agregar el libro en el servidor');
+        try { showToast('No se pudo agregar el libro en el servidor', 'warning') } catch (e) { alert('No se pudo agregar el libro en el servidor') }
       }
     } catch (err) {
       console.error('Error enviando libro al servidor:', err);
-      alert('Error de red al agregar/actualizar libro');
+      try { showToast('Error de red al agregar/actualizar libro', 'error') } catch (e) { alert('Error de red al agregar/actualizar libro') }
     }
   });
 });
@@ -1069,14 +1197,14 @@ async function openEditBookModal(id) {
     if (!res.ok) {
       const err = await res.json().catch(()=>null);
       console.error('Error obteniendo libro para editar:', err || res.status);
-      alert('No se pudo cargar la información del libro');
+      try { showToast('No se pudo cargar la información del libro', 'error') } catch (e) { alert('No se pudo cargar la información del libro') }
       return;
     }
 
     const data = await res.json();
     if (!data || !data.success) {
       console.error('Respuesta inválida al obtener libro:', data);
-      alert('No se pudo cargar la información del libro');
+      try { showToast('No se pudo cargar la información del libro', 'error') } catch (e) { alert('No se pudo cargar la información del libro') }
       return;
     }
 
@@ -1092,7 +1220,7 @@ async function openEditBookModal(id) {
     if (modal) modal.classList.add('active');
   } catch (err) {
     console.error('Error en openEditBookModal:', err);
-    alert('Error cargando datos del libro');
+    try { showToast('Error cargando datos del libro', 'error') } catch (e) { alert('Error cargando datos del libro') }
   }
 }
 
@@ -1105,15 +1233,15 @@ async function deleteFeaturedBook(id) {
     const res = await fetch(`/libros/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (res.ok && data && data.success) {
-      alert('Libro eliminado');
+      try { showToast('Libro eliminado', 'success') } catch (e) { alert('Libro eliminado') }
       await loadFeaturedBooks();
     } else {
       console.error('Error eliminando libro:', data);
-      alert('No se pudo eliminar el libro');
+      try { showToast('No se pudo eliminar el libro', 'error') } catch (e) { alert('No se pudo eliminar el libro') }
     }
   } catch (err) {
     console.error('Error en deleteFeaturedBook:', err);
-    alert('Error de red');
+    try { showToast('Error de red', 'error') } catch (e) { alert('Error de red') }
   }
 }
 

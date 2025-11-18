@@ -5,6 +5,16 @@ function goMiCuenta() {
    window.location.href = "mi-cuenta.html";
 }
 
+// Compatibilidad: algunas vistas llaman a `renderCart()` — delegar a funciones locales
+function renderCart() {
+    if (typeof updateCartDisplay === 'function') {
+        try { updateCartDisplay(); return; } catch (e) { console.warn('renderCart -> updateCartDisplay failed', e) }
+    }
+    if (typeof loadCart === 'function') {
+        try { loadCart(); return; } catch (e) { console.warn('renderCart -> loadCart failed', e) }
+    }
+}
+
 
 // ========funciont toast========
 function showToast(message, type = "success") {
@@ -28,6 +38,69 @@ function showToast(message, type = "success") {
         toast.classList.remove("show");
         setTimeout(() => toast.remove(), 400);
     }, 3000);
+}
+
+// Confirmación no bloqueante usando un "toast" con botones (similar a la usada en otras vistas)
+function confirmWithToast(message, onConfirm, onCancel) {
+    const wrapper = document.createElement('div')
+    wrapper.className = 'confirm-toast-wrapper'
+    wrapper.style.position = 'fixed'
+    wrapper.style.left = '50%'
+    wrapper.style.bottom = '24px'
+    wrapper.style.transform = 'translateX(-50%)'
+    wrapper.style.zIndex = 9999
+    wrapper.style.background = '#fff'
+    wrapper.style.border = '1px solid rgba(0,0,0,0.08)'
+    wrapper.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)'
+    wrapper.style.padding = '12px 14px'
+    wrapper.style.borderRadius = '10px'
+    wrapper.style.display = 'flex'
+    wrapper.style.alignItems = 'center'
+    wrapper.style.gap = '12px'
+
+    const msg = document.createElement('div')
+    msg.textContent = message
+    msg.style.color = '#222'
+    msg.style.fontSize = '14px'
+
+    const btnConfirm = document.createElement('button')
+    btnConfirm.textContent = 'Confirmar'
+    btnConfirm.style.background = '#6B00FF'
+    btnConfirm.style.color = '#fff'
+    btnConfirm.style.border = 'none'
+    btnConfirm.style.padding = '8px 10px'
+    btnConfirm.style.borderRadius = '8px'
+    btnConfirm.style.cursor = 'pointer'
+
+    const btnCancel = document.createElement('button')
+    btnCancel.textContent = 'Cancelar'
+    btnCancel.style.background = '#eee'
+    btnCancel.style.color = '#333'
+    btnCancel.style.border = 'none'
+    btnCancel.style.padding = '8px 10px'
+    btnCancel.style.borderRadius = '8px'
+    btnCancel.style.cursor = 'pointer'
+
+    wrapper.appendChild(msg)
+    wrapper.appendChild(btnConfirm)
+    wrapper.appendChild(btnCancel)
+
+    document.body.appendChild(wrapper)
+
+    const cleanup = () => { if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper) }
+
+    btnConfirm.addEventListener('click', () => {
+        try { onConfirm && onConfirm() } catch (e) { console.error('confirmWithToast onConfirm error', e) }
+        cleanup()
+    })
+
+    btnCancel.addEventListener('click', () => {
+        try { onCancel && onCancel() } catch (e) { /* ignore */ }
+        cleanup()
+    })
+
+    const timeout = setTimeout(() => { cleanup(); if (onCancel) onCancel() }, 10000)
+    [btnConfirm, btnCancel].forEach(b => b.addEventListener('click', () => clearTimeout(timeout)))
 }
 
 
@@ -82,11 +155,14 @@ function removeFromCart(index) {
 }
 
 function clearCart() {
-    if (confirm("¿Estás seguro de vaciar el carrito?")) {
-        localStorage.removeItem("bookCart");
+    confirmWithToast('¿Estás seguro de vaciar el carrito?', () => {
+        localStorage.removeItem('bookCart');
         updateCartCount();
         renderCart();
-    }
+        try { showToast('Carrito vaciado', 'success') } catch (e) { /* ignore */ }
+    }, () => {
+        try { showToast('Acción cancelada', 'error') } catch (e) { /* ignore */ }
+    })
 }
 
 
@@ -252,34 +328,58 @@ function searchBooks() {
 }
 
 
-// 👉 Función para agregar un libro al carrito
-function addToCart(id, titulo, autor, precio, imagen) {
-  console.log("Agregando libro al carrito...");
+// Añadir libro al carrito: intenta servidor con credenciales, cae a localStorage
+function addToCart(id, titulo, autores, precio, imagen) {
+    const parsedPrice = Number.parseFloat(String(precio).replace(/[^0-9.-]+/g, "")) || 0
+    const payload = {
+        libro_id_api: id,
+        titulo: titulo,
+        cantidad: 1,
+        precio_unitario: parsedPrice,
+        imagen: imagen
+    }
 
-  fetch("http://localhost:3000/carrito/agregar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include", // 👈 ESTA LÍNEA ES LA CLAVE (envía la cookie de sesión)
-    body: JSON.stringify({
-      libro_id_api: id,
-      titulo: titulo,
-      cantidad: 1,
-      precio_unitario: precio,
-      imagen: imagen
+    fetch('http://localhost:3000/carrito/agregar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
     })
-  })
-    .then(response => response.json())
+    .then(res => res.json().catch(() => ({ success: false })))
     .then(data => {
-      if (data.success) {
-        alert("Libro agregado al carrito ✅");
-      } else {
-        alert("Error al agregar al carrito: " + data.message);
-      }
+        if (data && data.success) {
+            try { showToast(`"${titulo}" agregado al carrito`, 'success') } catch (e) { /* ignore */ }
+            try { if (typeof updateAllCounts === 'function') updateAllCounts(); else if (typeof updateCartCount === 'function') updateCartCount() } catch (e) { /* ignore */ }
+            try { if (typeof loadCart === 'function') loadCart(); else if (typeof renderCart === 'function') renderCart() } catch (e) { /* ignore */ }
+            return
+        }
+
+        // Fallback local si el servidor no acepta
+        const raw = localStorage.getItem('bookCart')
+        let cart = []
+        try { cart = raw ? JSON.parse(raw) : [] } catch (e) { cart = [] }
+        const idx = cart.findIndex(it => String(it.id) === String(id) || String(it.libro_id_api) === String(id))
+        if (idx !== -1) {
+            cart[idx].quantity = (cart[idx].quantity || cart[idx].cantidad || 0) + 1
+        } else {
+            cart.push({ id, titulo, autores, precio: parsedPrice, imagen, quantity: 1 })
+        }
+        localStorage.setItem('bookCart', JSON.stringify(cart))
+        try { showToast(`"${titulo}" agregado al carrito (local)`, 'success') } catch (e) { /* ignore */ }
+        try { if (typeof updateAllCounts === 'function') updateAllCounts() } catch (e) { /* ignore */ }
     })
-    .catch(error => {
-      console.error("Error al agregar al carrito:", error);
-      alert("Error al agregar el libro al carrito ❌");
-    });
+    .catch(err => {
+        console.warn('addToCart network error, using local fallback', err)
+        const raw = localStorage.getItem('bookCart')
+        let cart = []
+        try { cart = raw ? JSON.parse(raw) : [] } catch (e) { cart = [] }
+        const idx = cart.findIndex(it => String(it.id) === String(id))
+        if (idx !== -1) cart[idx].quantity = (cart[idx].quantity || 0) + 1
+        else cart.push({ id, titulo, autores, precio: parsedPrice, imagen, quantity: 1 })
+        localStorage.setItem('bookCart', JSON.stringify(cart))
+        try { showToast(`"${titulo}" agregado al carrito (local)`, 'success') } catch (e) { /* ignore */ }
+        try { if (typeof updateAllCounts === 'function') updateAllCounts() } catch (e) { /* ignore */ }
+    })
 }
 
 
@@ -296,6 +396,19 @@ function openModal(id, title, authors, description, imageUrl, price) {
     // Mostrar modal (usar flex para centrar con CSS)
     const modal = document.getElementById("bookModal");
     modal.style.display = "flex";
+
+    // Wire modal buttons if present
+    const addBtn = document.getElementById('modal-add-btn')
+    if (addBtn) {
+        addBtn.onclick = function (e) {
+            // prevenir doble submit visual
+            try { addToCart(id, title, authors, price, imageUrl) } catch (err) { console.warn('addToCart failed from modal', err) }
+            // opcional: cerrar modal al añadir
+            try { modal.style.display = 'none' } catch (e) { /* ignore */ }
+        }
+    }
+
+    // Nota: el botón "Ver más" fue eliminado del modal; navegación a detalle se hace desde la tarjeta.
 
     // Cerrar al hacer clic fuera
     modal.onclick = function(event) {
@@ -365,30 +478,7 @@ function saveBook(id, title, author, price, imageUrl) {
 
 
 
-function addToCart(libroId, titulo, autores, precio, imagen) {
-    fetch("http://localhost:3000/carrito/agregar", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            libro_id_api: libroId,
-            titulo: titulo,
-            cantidad: 1,
-            precio_unitario: parseFloat(precio.replace(/[^0-9.-]+/g,"")),
-            imagen: imagen
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if(data.success){
-            alert(`"${titulo}" agregado al carrito ✅`);
-        } else {
-            alert("Error al agregar al carrito ❌");
-        }
-    })
-    .catch(err => console.error("Error al agregar al carrito:", err));
-}
+
 
 
 

@@ -84,26 +84,144 @@ function loadCart() {
 
 }
 
+// Compatibilidad: algunas vistas llaman a `renderCart()` — delegar a `loadCart()`
+function renderCart() {
+  if (typeof loadCart === 'function') {
+    try { loadCart(); return; } catch (e) { console.warn('renderCart -> loadCart failed', e) }
+  }
+  // Si no hay `loadCart`, no hacemos nada (evita ReferenceError cuando se llama desde otras páginas)
+}
+
+// Confirmación no bloqueante usando un "toast" con botones
+function confirmWithToast(message, onConfirm, onCancel) {
+  // Crear contenedor
+  const wrapper = document.createElement('div')
+  wrapper.className = 'confirm-toast-wrapper'
+  wrapper.style.position = 'fixed'
+  wrapper.style.left = '50%'
+  wrapper.style.bottom = '24px'
+  wrapper.style.transform = 'translateX(-50%)'
+  wrapper.style.zIndex = 9999
+  wrapper.style.background = '#fff'
+  wrapper.style.border = '1px solid rgba(0,0,0,0.08)'
+  wrapper.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)'
+  wrapper.style.padding = '12px 14px'
+  wrapper.style.borderRadius = '10px'
+  wrapper.style.display = 'flex'
+  wrapper.style.alignItems = 'center'
+  wrapper.style.gap = '12px'
+
+  const msg = document.createElement('div')
+  msg.textContent = message
+  msg.style.color = '#222'
+  msg.style.fontSize = '14px'
+
+  const btnConfirm = document.createElement('button')
+  btnConfirm.textContent = 'Confirmar'
+  btnConfirm.style.background = '#6B00FF'
+  btnConfirm.style.color = '#fff'
+  btnConfirm.style.border = 'none'
+  btnConfirm.style.padding = '8px 10px'
+  btnConfirm.style.borderRadius = '8px'
+  btnConfirm.style.cursor = 'pointer'
+
+  const btnCancel = document.createElement('button')
+  btnCancel.textContent = 'Cancelar'
+  btnCancel.style.background = '#eee'
+  btnCancel.style.color = '#333'
+  btnCancel.style.border = 'none'
+  btnCancel.style.padding = '8px 10px'
+  btnCancel.style.borderRadius = '8px'
+  btnCancel.style.cursor = 'pointer'
+
+  wrapper.appendChild(msg)
+  wrapper.appendChild(btnConfirm)
+  wrapper.appendChild(btnCancel)
+
+  document.body.appendChild(wrapper)
+
+  const cleanup = () => { if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper) }
+
+  btnConfirm.addEventListener('click', () => {
+    try { onConfirm && onConfirm() } catch (e) { console.error('confirmWithToast onConfirm error', e) }
+    cleanup()
+  })
+
+  btnCancel.addEventListener('click', () => {
+    try { onCancel && onCancel() } catch (e) { /* ignore */ }
+    cleanup()
+  })
+
+  // Auto-dismiss after 10s
+  const timeout = setTimeout(() => { cleanup(); if (onCancel) onCancel() }, 10000)
+  // Clear timeout if user interacts (proteger contra valores nulos)
+  const _interactiveBtns = [btnConfirm, btnCancel].filter(Boolean)
+  _interactiveBtns.forEach(b => b.addEventListener('click', () => clearTimeout(timeout)))
+}
+
  
 function updateQuantity(libro_id_api, delta) {
-    fetch('http://localhost:3000/carrito/actualizar', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ libro_id_api, delta })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            loadCart(); // recarga el carrito con las cantidades actualizadas
+  // Intentar actualizar en el servidor; si falla, hacer fallback a localStorage
+  fetch('http://localhost:3000/carrito/actualizar', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ libro_id_api, delta })
+  })
+  .then(res => res.json().catch(() => ({ success: false })))
+  .then(data => {
+    if (data && data.success) {
+      // servidor actualizó correctamente
+      try { loadCart(); } catch (e) { /* ignore */ }
+      return;
+    }
+
+    // Fallback: actualizar carrito localmente
+    try {
+      const cart = getCart() || [];
+      const idx = cart.findIndex(item => String(item.id) === String(libro_id_api) || String(item.libro_id_api) === String(libro_id_api));
+      if (idx !== -1) {
+        const it = cart[idx];
+        const currentQty = Number(it.quantity || it.cantidad || 0);
+        const newQty = currentQty + Number(delta);
+        if (newQty > 0) {
+          // actualizar cantidad
+          // normalizar a `quantity` para la UI local
+          it.quantity = newQty;
         } else {
-            console.error('Error al actualizar cantidad:', data.message);
+          // eliminar si llega a 0
+          cart.splice(idx, 1);
         }
-    })
-    .catch(err => console.error('Error en fetch updateQuantity:', err));
+        saveCart(cart);
+        try { showNotification('Cantidad actualizada', 'success') } catch (e) { /* ignore */ }
+      } else {
+        console.warn('Elemento no encontrado en carrito local para actualizar:', libro_id_api);
+      }
+    } catch (e) {
+      console.warn('Fallback local updateQuantity falló:', e);
+    }
+  })
+  .catch(err => {
+    // Error de red: intentar fallback local
+    try {
+      const cart = getCart() || [];
+      const idx = cart.findIndex(item => String(item.id) === String(libro_id_api) || String(item.libro_id_api) === String(libro_id_api));
+      if (idx !== -1) {
+        const it = cart[idx];
+        const currentQty = Number(it.quantity || it.cantidad || 0);
+        const newQty = currentQty + Number(delta);
+        if (newQty > 0) it.quantity = newQty; else cart.splice(idx, 1);
+        saveCart(cart);
+        try { showNotification('Cantidad actualizada (local)', 'success') } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      console.error('updateQuantity fallback failure:', e, err);
+    }
+  });
 }
+
 
 
 // Llamar al cargar la página
@@ -116,23 +234,25 @@ window.addEventListener('DOMContentLoaded', loadCart);
 
 
  function removeFromCart(libro_id_api) {
-  if (!confirm("¿Seguro que quieres eliminar este libro del carrito?")) return;
-
-  fetch(`http://localhost:3000/carrito/${libro_id_api}`, {
+  confirmWithToast('¿Seguro que quieres eliminar este libro del carrito?', () => {
+    fetch(`http://localhost:3000/carrito/${libro_id_api}`, {
       method: 'DELETE',
       credentials: 'include',
-  })
-  .then(res => res.json())
-  .then(data => {
+    })
+    .then(res => res.json())
+    .then(data => {
       if (data.success) {
-          alert("Libro eliminado del carrito");
-          loadCart(); 
+        try { showNotification('Libro eliminado del carrito', 'success') } catch (e) { console.log('Libro eliminado del carrito') }
+        if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
       } else {
-          alert("Error al eliminar el libro del carrito");
-          console.error(data.message);
+        try { showNotification('Error al eliminar el libro del carrito', 'warning') } catch (e) { console.error('Error al eliminar el libro del carrito') }
+        console.error(data.message);
       }
+    })
+    .catch(err => console.error('Error en fetch removeFromCart:', err));
+  }, () => {
+    try { showNotification('Eliminación cancelada', 'info') } catch (e) { /* ignore */ }
   })
-  .catch(err => console.error("Error en fetch removeFromCart:", err));
 }
 
 
@@ -141,7 +261,7 @@ window.addEventListener('DOMContentLoaded', loadCart);
 document.addEventListener("DOMContentLoaded", () => {
   loadUserProfile()
   updateAllCounts()
-  renderCart()
+  loadCart()
   renderFavorites()
   renderOrders()
   showTab("cart") // Show cart tab by default
@@ -585,7 +705,7 @@ function proceedToCheckout() {
     .then(res => res.json())
     .then(data => {
       if (!data.success || !data.items || data.items.length === 0) {
-        alert('Tu carrito está vacío o no se pudo cargar.');
+        try { showNotification('Tu carrito está vacío o no se pudo cargar.', 'warning') } catch (e) { console.warn('Tu carrito está vacío o no se pudo cargar.') }
         return;
       }
 
@@ -610,12 +730,28 @@ function proceedToCheckout() {
       checkoutItems.innerHTML = html;
       checkoutTotal.textContent = `$${total.toLocaleString()}`;
 
-      // Mostrar el modal
-      checkoutModal.style.display = 'block';
+      // Prefill checkout fields from stored user session (editable)
+      try {
+        const user = JSON.parse(localStorage.getItem('userSession')) || {}
+        const nameEl = document.getElementById('checkout-name')
+        const emailEl = document.getElementById('checkout-email')
+        const phoneEl = document.getElementById('checkout-phone')
+        const addressEl = document.getElementById('checkout-address')
+
+        if (nameEl) nameEl.value = user.nombre || user.name || ''
+        if (emailEl) emailEl.value = user.email || user.correo || ''
+        if (phoneEl) phoneEl.value = user.telefono || user.celular || ''
+        if (addressEl) addressEl.value = user.direccion || user.address || ''
+      } catch (e) {
+        // ignore parse errors
+      }
+
+      // Mostrar el modal (usar flex para centrar según CSS `.modal`)
+      checkoutModal.style.display = 'flex';
     })
     .catch(err => {
       console.error('Error al obtener carrito para checkout:', err);
-      alert('Hubo un error al cargar el carrito.');
+      try { showNotification('Hubo un error al cargar el carrito.', 'warning') } catch (e) { console.warn('Hubo un error al cargar el carrito.') }
     });
 }
 
@@ -634,15 +770,15 @@ function confirmOrder() {
   const address = document.getElementById("checkout-address").value.trim();
 
   if (!name || !email || !phone || !address) {
-    alert("Por favor completa todos los campos de entrega.");
+    try { showNotification("Por favor completa todos los campos de entrega.", 'warning') } catch (e) { console.warn('Por favor completa todos los campos de entrega.') }
     return;
   }
 
   fetch("http://localhost:3000/carrito", { credentials: "include" })
     .then(res => res.json())
     .then(data => {
-      if (!data.success || data.items.length === 0) {
-        alert("Tu carrito está vacío. Agrega libros antes de confirmar el pedido.");
+        if (!data.success || data.items.length === 0) {
+        try { showNotification("Tu carrito está vacío. Agrega libros antes de confirmar el pedido.", 'warning') } catch (e) { console.warn('Tu carrito está vacío. Agrega libros antes de confirmar el pedido.') }
         return;
       }
 
@@ -664,7 +800,7 @@ function confirmOrder() {
     .then(res => res ? res.json() : null)
    .then(orderData => {
   if (orderData && orderData.success) {
-    alert("Pedido confirmado correctamente.");
+    try { showNotification("Pedido confirmado correctamente.", 'success') } catch (e) { console.log('Pedido confirmado correctamente.') }
     
     closeCheckoutModal();
 
@@ -695,13 +831,13 @@ function confirmOrder() {
       });
   } else {
     console.error("Error al confirmar pedido:", orderData);
-    alert(" Ocurrió un error al confirmar el pedido.");
+    try { showNotification("Ocurrió un error al confirmar el pedido.", 'warning') } catch (e) { console.error('Ocurrió un error al confirmar el pedido.') }
   }
 })
 
     .catch(err => {
       console.error("Error al procesar pedido:", err);
-      alert(" Error de conexión al procesar el pedido.");
+      try { showNotification("Error de conexión al procesar el pedido.", 'warning') } catch (e) { console.error('Error de conexión al procesar el pedido.') }
     });
 }
 
@@ -776,8 +912,9 @@ function loadOrders() {
 
         switch (order.estado) {
           case "pendiente":
-            statusText = "Pendiente";
-            statusClass = "status-pending";
+            // Ocultar el estado "Pendiente" en la vista según petición
+            statusText = "";
+            statusClass = "";
             break;
           case "enviado":
             statusText = "Enviado";
@@ -803,7 +940,7 @@ function loadOrders() {
                           ${new Date(order.fecha_creacion).toLocaleDateString()}
                       </div>
                   </div>
-                  <div class="order-status ${statusClass}">${statusText}</div>
+                    ${statusText ? `<div class="order-status ${statusClass}">${statusText}</div>` : ''}
               </div>
               <div class="order-items">
                   <strong>Artículos:</strong> ${itemCount} | 
@@ -836,7 +973,7 @@ function saveBook(bookId) {
 
   // Verificar si el libro ya está guardado
   if (favorites.includes(bookId)) {
-    alert("📚 Este libro ya está en tus favoritos");
+    try { showToast("📚 Este libro ya está en tus favoritos", 'info') } catch (e) { alert("📚 Este libro ya está en tus favoritos") }
     return;
   }
 
@@ -849,7 +986,7 @@ function saveBook(bookId) {
   // Actualizar el contador
   updateFavoritesCount();
 
-  alert("❤️ Libro guardado en favoritos");
+  try { showToast("❤️ Libro guardado en favoritos", 'success') } catch (e) { alert("❤️ Libro guardado en favoritos") }
 }
 
 
@@ -928,10 +1065,12 @@ function updateFavoritesCount() {
   }
 }
 function clearFavorites() {
-  if (confirm("¿Seguro que quieres eliminar todos tus favoritos?")) {
-    localStorage.removeItem("favorites");
-    loadFavorites();
-  }
+  // Eliminamos sin confirmación (petición del usuario)
+  try {
+    localStorage.removeItem('favorites')
+  } catch (e) { /* ignore */ }
+  try { if (typeof loadFavorites === 'function') loadFavorites() } catch (e) { /* ignore */ }
+  try { showNotification('Favoritos limpiados', 'info') } catch (e) { console.log('Favoritos limpiados') }
 }
 
 function saveBook(id, title, author, price, imageUrl) {
@@ -939,14 +1078,14 @@ function saveBook(id, title, author, price, imageUrl) {
 
   // Evitar duplicados
   if (favorites.some(book => book.id === id)) {
-    alert("📘 Este libro ya está en tus favoritos");
+    try { showToast("📘 Este libro ya está en tus favoritos", 'info') } catch (e) { alert("📘 Este libro ya está en tus favoritos") }
     return;
   }
 
   favorites.push({ id, title, author, price, imageUrl });
   saveFavorites(favorites);
   renderFavorites();
-  alert("❤️ Libro añadido a favoritos");
+  try { showToast("❤️ Libro añadido a favoritos", 'success') } catch (e) { alert("❤️ Libro añadido a favoritos") }
 }
 
 
@@ -962,12 +1101,34 @@ function saveBook(id, title, author, price, imageUrl) {
 
 
 function clearCart() {
-  if (confirm("¿Estás seguro de vaciar el carrito?")) {
-    localStorage.removeItem("bookCart")
-    updateAllCounts()
-    renderCart()
-    showNotification("Carrito vaciado", "info")
-  }
+  confirmWithToast('¿Estás seguro de vaciar el carrito?', () => {
+    // Intentar limpiar en servidor (si hay sesión). Si falla, hacer fallback local.
+    fetch('http://localhost:3000/carrito/limpiar', {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+    .then(res => res.json().catch(() => ({ success: false })))
+    .then(data => {
+      try { localStorage.removeItem('bookCart') } catch (e) { /* ignore */ }
+      try { updateAllCounts() } catch (e) { /* ignore */ }
+      if (data && data.success) {
+        if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
+      } else {
+        // Si backend no respondió éxito, recargar desde local fallback
+        if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
+      }
+      try { showNotification('Carrito vaciado', 'info') } catch (e) { console.log('Carrito vaciado') }
+    })
+    .catch(err => {
+      // Fallback local
+      try { localStorage.removeItem('bookCart') } catch (e) { /* ignore */ }
+      try { updateAllCounts() } catch (e) { /* ignore */ }
+      if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
+      try { showNotification('Carrito vaciado (local)', 'info') } catch (e) { console.log('Carrito vaciado (local)') }
+    })
+  }, () => {
+    try { showNotification('Acción cancelada', 'info') } catch (e) { /* ignore */ }
+  })
 }
 
 // ===== FAVORITES FUNCTIONALITY =====
@@ -985,27 +1146,65 @@ function saveFavorites(favorites) {
 
 
 function addToCartFromFavorites(bookId, title, authors, price, imageUrl) {
-  const newBook = {
-    id: bookId,
-    title,
-    author: authors,
-    price: Number.parseFloat(price) || 0,
-    image: imageUrl,
-    quantity: 1,
+  // Intentar primero agregar al carrito del servidor (si el usuario tiene sesión)
+  const parsedPrice = Number.parseFloat(String(price).replace(/[^0-9.-]+/g, "")) || 0
+
+  fetch('http://localhost:3000/carrito/agregar', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      libro_id_api: bookId,
+      titulo: title,
+      cantidad: 1,
+      precio_unitario: parsedPrice,
+      imagen: imageUrl
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data && data.success) {
+      showNotification(`"${title}" añadido al carrito`, 'success')
+      // refrescar la vista del carrito (usa loadCart que renderiza desde servidor)
+      if (typeof loadCart === 'function') {
+        try { loadCart() } catch (e) { /* ignore */ }
+      }
+      try { updateAllCounts() } catch (e) { /* ignore */ }
+      return
+    }
+
+    // Si el servidor no respondió con éxito, fallback a localStorage
+    fallbackAddToLocal()
+  })
+  .catch(err => {
+    // En caso de error de red, usar fallback local
+    console.warn('Error agregando al carrito en el servidor, usando localStorage:', err)
+    fallbackAddToLocal()
+  })
+
+  function fallbackAddToLocal() {
+    const newBook = {
+      id: bookId,
+      title,
+      author: authors,
+      price: parsedPrice,
+      image: imageUrl,
+      quantity: 1,
+    }
+
+    const cart = getCart()
+    const existingIndex = cart.findIndex((book) => book.id === bookId)
+
+    if (existingIndex !== -1) {
+      cart[existingIndex].quantity += 1
+      showNotification(`"${title}" cantidad actualizada en el carrito`, "success")
+    } else {
+      cart.push(newBook)
+      showNotification(`"${title}" añadido al carrito`, "success")
+    }
+
+    saveCart(cart)
   }
-
-  const cart = getCart()
-  const existingIndex = cart.findIndex((book) => book.id === bookId)
-
-  if (existingIndex !== -1) {
-    cart[existingIndex].quantity += 1
-    showNotification(`"${title}" cantidad actualizada en el carrito`, "success")
-  } else {
-    cart.push(newBook)
-    showNotification(`"${title}" añadido al carrito`, "success")
-  }
-
-  saveCart(cart)
 }
 
 function removeFromFavorites(index) {
@@ -1017,12 +1216,11 @@ function removeFromFavorites(index) {
 }
 
 function clearFavorites() {
-  if (confirm("¿Estás seguro de limpiar todos los favoritos?")) {
-    localStorage.removeItem("bookFavorites")
-    updateAllCounts()
-    renderFavorites()
-    showNotification("Favoritos limpiados", "info")
-  }
+  // Eliminamos todos los favoritos sin confirmación (petición del usuario)
+  try { localStorage.removeItem('bookFavorites') } catch (e) { /* ignore */ }
+  try { updateAllCounts() } catch (e) { /* ignore */ }
+  try { renderFavorites() } catch (e) { /* ignore */ }
+  try { showNotification('Favoritos limpiados', 'info') } catch (e) { console.log('Favoritos limpiados') }
 }
 
 // ===== ORDERS FUNCTIONALITY =====
@@ -1039,6 +1237,24 @@ function getCart() {
   } catch (e) {
     console.warn('getCart parse error', e)
     return []
+  }
+}
+
+// Guardar carrito en localStorage y actualizar contadores/UI
+function saveCart(cart) {
+  try {
+    localStorage.setItem('bookCart', JSON.stringify(cart || []))
+  } catch (e) {
+    console.warn('saveCart error', e)
+  }
+
+  // actualizar contadores y vistas si existen
+  try { updateAllCounts() } catch (e) { /* ignore */ }
+  // Preferir llamadas seguras a funciones que puedan no estar definidas
+  if (typeof renderCart === 'function') {
+    try { renderCart() } catch (e) { /* ignore */ }
+  } else if (typeof loadCart === 'function') {
+    try { loadCart() } catch (e) { /* ignore */ }
   }
 }
 
