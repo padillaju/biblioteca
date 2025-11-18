@@ -1,81 +1,136 @@
-/* Reset básico */
+/* ================================
+   Fuente global
+================================ */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
+
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-/* Fondo degradado */
 body {
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: linear-gradient(135deg, #4facfe, #00f2fe);
+  font-family: "Poppins", sans-serif;
+  background: linear-gradient(135deg, #5A00E0, #009DFF); /* Morado → Azul */
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-/* Contenedor del formulario */
-form {
-    background: #fff;
-    padding: 2.5rem;
-    border-radius: 15px;
-    box-shadow: 0px 5px 20px rgba(0, 0, 0, 0.2);
-    width: 350px;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
+/* ================================
+   Tarjeta del registro
+================================ */
+.registro-container {
+  background: #ffffff;
+  width: 430px;
+  padding: 40px 35px;
+  border-radius: 20px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+  animation: fadeIn 0.7s ease-in-out;
 }
 
-/* Título */
-.titulo {
-    position: absolute;
-    top: 10%;
-    text-align: center;
-    width: 100%;
-    color: white;
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Inputs */
-form input {
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    outline: none;
-    transition: 0.3s;
-    font-size: 15px;
+/* ================================
+   Título
+================================ */
+.titulo h2 {
+  text-align: center;
+  margin-bottom: 25px;
+  color: #4A00B5;
+  font-size: 28px;
+  font-weight: 600;
 }
 
-form input:focus {
-    border-color: #4facfe;
-    box-shadow: 0 0 6px rgba(79, 172, 254, 0.5);
+/* ================================
+   INPUT con iconos
+================================ */
+.input-group {
+  position: relative;
+  width: 100%;
+  margin-bottom: 25px;
 }
 
-/* Botón */
-form button {
-    background: #4facfe;
-    color: white;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 16px;
-    transition: 0.3s;
+.input-group i {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  color: #7300FF;
 }
 
-form button:hover {
-    background: #00c6ff;
-    transform: scale(1.05);
+/* Input estilo moderno */
+.input-group input {
+  width: 100%;
+  padding: 12px 15px 12px 45px; /* espacio para ícono */
+  border-radius: 12px;
+  border: 2px solid #d8d8d8;
+  font-size: 15px;
+  outline: none;
+  transition: 0.3s ease;
 }
 
-/* Mensaje */
+.input-group input:focus {
+  border-color: #7300FF;
+  box-shadow: 0 0 6px rgba(115, 0, 255, 0.35);
+}
+
+/* Error debajo del input */
+.field-error {
+  display: block;
+  margin-top: -18px;
+  margin-bottom: 8px;
+  color: #D80032;
+  font-size: 13px;
+}
+
+/* ================================
+   Botón Registrar
+================================ */
+button {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6B00FF, #009DFF);
+  color: white;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.20);
+}
+
+/* ================================
+   Enlace inferior
+================================ */
+form a {
+  display: block;
+  text-align: center;
+  margin-top: 18px;
+  color: #6B00FF;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+form a:hover {
+  text-decoration: underline;
+}
+
+/* ================================
+   Mensaje de alerta
+================================ */
 #mensaje {
-    margin-top: 10px;
-    font-size: 14px;
-    color: #333;
-    text-align: center;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 14px;
 }

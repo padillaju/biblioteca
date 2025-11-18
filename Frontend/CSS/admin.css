@@ -182,6 +182,78 @@ body {
   align-items: center;
 }
 
+/* Order filter controls styling */
+.section-actions label[for="orderDateFilter"] {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.section-actions #orderDateFilter,
+.section-actions #orderStartDate,
+.section-actions #orderEndDate {
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-weight: 600;
+  color: #333;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.section-actions #orderDateFilter:focus,
+.section-actions #orderStartDate:focus,
+.section-actions #orderEndDate:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 6px 18px rgba(102,126,234,0.08);
+}
+
+.section-actions #orderStartDate,
+.section-actions #orderEndDate {
+  width: 170px;
+  padding-left: 0.7rem;
+}
+
+.section-actions #applyOrderFilter {
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #5a67d8, #805ad5);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(80,88,200,0.12);
+}
+
+.section-actions #applyOrderFilter:hover {
+  transform: translateY(-2px);
+}
+
+/* Hide date inputs by default (JS toggles display) but keep them accessible for layout */
+#orderStartDate[style*="display:none"], #orderEndDate[style*="display:none"] {
+  display: none !important;
+}
+
+/* Responsive: make filter controls wrap neatly */
+@media (max-width: 768px) {
+  .section-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .section-actions #orderStartDate,
+  .section-actions #orderEndDate,
+  .section-actions #orderDateFilter {
+    width: 100%;
+  }
+
+  .section-actions label[for="orderDateFilter"] {
+    text-align: left;
+  }
+}
+
 /* Stats Grid */
 .stats-grid {
   display: grid;
@@ -268,6 +340,86 @@ body {
   gap: 1rem;
 }
 
+/* Bar wrapper for generated charts */
+.bar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 0;
+  min-width: 30px;
+}
+
+.bar-wrap .bar {
+  width: 100%;
+  max-width: 60px;
+  border-radius: 6px 6px 0 0;
+}
+
+/* Make bars more visible even when very small */
+.bar-wrap .bar {
+  min-height: 6px;
+  background: linear-gradient(180deg, #6b46c1, #4c1d95);
+  box-shadow: 0 4px 10px rgba(76,29,149,0.15);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.bar-wrap .bar::before {
+  content: attr(title);
+  display: block;
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: #222;
+  white-space: nowrap;
+}
+
+.bar-label {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #666;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.chart-controls select {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: white;
+  font-weight: 600;
+  color: #333;
+}
+
+.chart-controls .btn-secondary {
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #5a67d8, #805ad5);
+  color: white;
+  border: none;
+  box-shadow: 0 6px 18px rgba(80, 88, 200, 0.15);
+}
+
+.chart-controls .btn-secondary:hover {
+  transform: translateY(-2px);
+}
+
+.chart .loading,
+.chart .error {
+  color: #666;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 .bar {
   background: linear-gradient(135deg, #667eea, #764ba2);
   border-radius: 4px 4px 0 0;
@@ -304,6 +456,7 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
+  justify-content: space-between;
 }
 
 .activity-item:last-child {
@@ -322,18 +475,50 @@ body {
   font-size: 0.9rem;
 }
 
-.activity-info {
+.activity-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-.activity-info p {
-  margin: 0;
-  font-size: 0.9rem;
+.activity-title {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.activity-meta {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 0.25rem;
 }
 
 .activity-time {
   font-size: 0.8rem;
-  color: #666;
+  color: #999;
+}
+
+.activity-action {
+  margin-left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-link {
+  background: transparent;
+  border: none;
+  color: #667eea;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.btn-link:hover {
+  background: rgba(102, 126, 234, 0.08);
+  transform: translateY(-2px);
 }
 
 /* Tables */

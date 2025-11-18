@@ -50,10 +50,10 @@
                     <i class="fas fa-chart-bar"></i>
                     <span>Reportes</span>
                 </li>
-                <li class="nav-item" data-section="settings">
+                <!-- <li class="nav-item" data-section="settings">
                     <i class="fas fa-cog"></i>
                     <span>Configuración</span>
-                </li>
+                </li> -->
             </ul>
         </nav>
     </aside>
@@ -93,7 +93,7 @@
                         <p>Ingresos Totales</p>
                     </div>
                 </div>
-                <div class="stat-card">
+                <!-- <div class="stat-card">
                     <div class="stat-icon">
                         <i class="fas fa-book"></i>
                     </div>
@@ -101,12 +101,20 @@
                         <h3 id="totalBooks">0</h3>
                         <p>Libros Vendidos</p>
                     </div>
-                </div>
+                </div> -->
             </div>
 
             <div class="dashboard-charts">
                 <div class="chart-container">
                     <h3>Ventas por Mes</h3>
+                    <div class="chart-controls">
+                        <select id="salesPeriodDashboard">
+                            <option value="week">Esta semana</option>
+                            <option value="month" selected>Este mes</option>
+                            <option value="year">Este año</option>
+                        </select>
+                        <button class="btn-secondary" onclick="generateSalesReport()">Ver</button>
+                    </div>
                     <div class="chart" id="salesChart">
                         <div class="chart-bars">
                             <div class="bar" style="height: 60%;" data-month="Ene" data-value="120"></div>
@@ -130,13 +138,16 @@
             <div class="section-header">
                 <h2>Gestión de Pedidos</h2>
                 <div class="section-actions">
-                    <select id="orderFilter">
-                        <option value="all">Todos los pedidos</option>
-                        <option value="pending">Pendientes</option>
-                        <option value="processing">En proceso</option>
-                        <option value="shipped">Enviados</option>
-                        <option value="delivered">Entregados</option>
+                    <label for="orderDateFilter">Filtrar por fecha:</label>
+                    <select id="orderDateFilter">
+                        <option value="all">Todos</option>
+                        <option value="today">Hoy</option>
+                        <option value="week">Esta semana</option>
+                        <option value="custom">Rango personalizado</option>
                     </select>
+                    <input type="date" id="orderStartDate" style="display:none; margin-left:8px;" />
+                    <input type="date" id="orderEndDate" style="display:none; margin-left:8px;" />
+                    <button class="btn-secondary" id="applyOrderFilter" style="margin-left:8px;">Aplicar</button>
                 </div>
             </div>
             
@@ -148,12 +159,10 @@
                             <th>Cliente</th>
                             <th>Fecha</th>
                             <th>Total</th>
-                            <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="ordersTable">
-                         Se llena dinámicamente 
                     </tbody>
                 </table>
             </div>
@@ -297,6 +306,7 @@
                 <span class="close" onclick="closeAddBookModal()">&times;</span>
             </div>
             <form id="addBookForm">
+                <input type="hidden" id="bookId">
                 <div class="form-group">
                     <label>Título del Libro</label>
                     <input type="text" id="bookTitle" required>
@@ -334,6 +344,19 @@
             </div>
             <div id="orderDetailsContent">
                  Se llena dinámicamente 
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para resumen de ventas -->
+    <div id="salesSummaryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Resumen de Ventas</h3>
+                <span class="close" onclick="closeSalesSummaryModal()">&times;</span>
+            </div>
+            <div id="salesSummaryContent" style="padding:16px;">
+                <!-- rellenado dinámicamente -->
             </div>
         </div>
     </div>

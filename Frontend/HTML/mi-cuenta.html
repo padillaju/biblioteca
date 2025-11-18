@@ -12,20 +12,23 @@
     <header>
         <nav class="container">
             <div class="logo" onclick="goToHome()">BookVerse</div>
-            <ul class="nav-links">
-                <li><a href="#" onclick="goToHome()">Inicio</a></li>
+            <!-- <ul class="nav-links">
+                <li><a href="/inicio" onclick="goToHome()">Inicio</a></li>
                 <li><a href="#libros">Libros</a></li>
                 <li><a href="#categorias">Categorías</a></li>
                 <li><a href="#ofertas">Ofertas</a></li>
                 <li><a href="#contacto">Contacto</a></li>
-            </ul>
-            <div class="header-actions">
-                <button class="account-btn active">
-                    <i class="fas fa-user-circle"></i> Mi Cuenta
+            </ul> -->
+                <div class="header-actions">
+                <button class="account-btn active" onclick="goToHome()">
+                    <i class="fas fa-home"></i> inicio
                 </button>
-                <button class="cart-btn" onclick="showTab('cart')">
+                  <button class="account-btn" onclick="logout()">
+                      <i class="fas fa-sign-out-alt"></i> cerrar sesión
+                </button>
+                <!-- <button class="cart-btn" onclick="showTab('cart')">
                     <i class="fas fa-shopping-cart"></i> Carrito (<span id="header-cart-count">0</span>)
-                </button>
+                </button> -->
             </div>
         </nav>
     </header>
@@ -150,39 +153,75 @@
                     <div class="section-header">
                         <h2><i class="fas fa-user"></i> Mi Perfil</h2>
                     </div>
-                    <div class="profile-form">
-                        <div class="form-group">
-                            <label for="profile-name-input">Nombre Completo</label>
-                            <input type="text" id="profile-name-input" placeholder="Ingresa tu nombre">
-                        </div>
-                        <div class="form-group">
-                            <label for="profile-email-input">Correo Electrónico</label>
-                            <input type="email" id="profile-email-input" placeholder="Ingresa tu email">
-                        </div>
-                        <div class="form-group">
-                            <label for="profile-phone-input">Teléfono</label>
-                            <input type="tel" id="profile-phone-input" placeholder="Ingresa tu teléfono">
-                        </div>
-                        <div class="form-group">
-                            <label for="profile-address-input">Dirección</label>
-                            <textarea id="profile-address-input" placeholder="Ingresa tu dirección"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="profile-photo-input">Foto de Perfil</label>
-                            <input type="file" id="profile-photo-input" accept="image/*">
+                    <div class="profile-form grid-two-columns">
+                        <div class="profile-form-left">
+                            <div class="form-group">
+                                <label for="profile-name-input">Nombre Completo</label>
+                                <input type="text" id="profile-name-input" placeholder="Ingresa tu nombre">
+                            </div>
+                            <div class="form-group">
+                                <label for="profile-email-input">Correo Electrónico</label>
+                                <input type="email" id="profile-email-input" placeholder="Ingresa tu email">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="profile-current-password-input">Contraseña actual</label>
+                                <input type="password" id="profile-current-password-input" placeholder="Ingresa tu contraseña actual">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="profile-new-password-input">Contraseña nueva</label>
+                                <input type="password" id="profile-new-password-input" placeholder="Ingresa la nueva contraseña">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="profile-phone-input">Teléfono</label>
+                                <input type="tel" id="profile-phone-input" placeholder="Ingresa tu teléfono">
+                            </div>
+                            <div class="form-group">
+                                <label for="profile-address-input">Dirección</label>
+                                <textarea id="profile-address-input" placeholder="Ingresa tu dirección"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="profile-photo-input">Foto de Perfil</label>
+                                <input type="file" id="profile-photo-input" accept="image/*">
+                                <div class="avatar-preview-wrapper">
+                                    <img id="profile-avatar-preview" src="" alt="Previsualización" style="display:none; width:100px; height:100px; object-fit:cover; border-radius:50%; margin-top:8px;" />
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button class="btn-primary" onclick="saveProfile()">
+                                    <i class="fas fa-save"></i> Guardar Cambios
+                                </button>
+                                <button class="btn-danger" onclick="logout()">
+                                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="form-actions">
-                            <button class="btn-primary" onclick="saveProfile()">
-                                <i class="fas fa-save"></i> Guardar Cambios
-                            </button>
-                            <button class="btn-danger" onclick="logout()">
-                                <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
-                            </button>
-                            
-                            
-                        </div>
-                        
+                        <aside class="profile-preview" id="profile-preview">
+                            <div class="preview-card">
+                                <div class="preview-avatar" id="preview-avatar-container">
+                                    <i class="fas fa-user-circle" id="preview-avatar-icon"></i>
+                                </div>
+                                <div class="preview-info">
+                                    <h3 id="preview-name">Usuario Invitado</h3>
+                                    <p id="preview-email">Inicia sesión para más funciones</p>
+                                    <p id="preview-phone"></p>
+                                    <p id="preview-address"></p>
+                                </div>
+                            </div>
+                            <div class="preview-meta">
+                                <h4>Resumen</h4>
+                                <ul>
+                                    <li><strong>Nombre:</strong> <span id="meta-name"></span></li>
+                                    <li><strong>Email:</strong> <span id="meta-email"></span></li>
+                                    <li><strong>Teléfono:</strong> <span id="meta-phone"></span></li>
+                                    <li><strong>Dirección:</strong> <span id="meta-address"></span></li>
+                                </ul>
+                            </div>
+                        </aside>
                     </div>
 
                 </div>
@@ -232,6 +271,25 @@
     <div class="notification" id="notification">
         <span id="notification-text">Notificación</span>
     </div>
+
+
+
+    <!-- Logout Confirmation Modal -->
+<div id="logout-modal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fas fa-sign-out-alt"></i> Cerrar sesión</h3>
+      <button id="logout-modal-close" class="close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p>¿Estás seguro de que quieres cerrar sesión?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="cancelLogout()">Cancelar</button>
+      <button class="btn-danger" onclick="confirmLogout()">Cerrar sesión</button>
+    </div>
+  </div>
+</div>
 
     <script src="../JS/mi-cuenta.js"></script>
 </body>

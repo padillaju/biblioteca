@@ -16,18 +16,17 @@
     <!-- Header -->
     <header>
         <nav class="container">
-            <div class="logo">BookVerse</div>
-            <ul class="nav-links">
-                <li><a href="#home">Inicio</a></li>
-                <li><a href="#libros">Libros</a></li>
-                <li><a href="#categorias">Categorías</a></li>
-                <li><a href="#ofertas">Ofertas</a></li>
-                <li><a href="#contacto">Contacto</a></li>
-            </ul>
-          <a href="mi-cuenta.html" class="menu-btn" >
-                <i class="fas fa-user-circle"></i> Mi Cuenta
-            </a>
-        </nav>
+              <div class="logo">BookVerse</div>
+              <div class="header-actions">
+                 <button class="account-btn active" onclick="goMiCuenta()">
+                     <i class="fas fa-user-circle"></i> Mi Cuenta
+                 </button>
+
+                 <button class="account-btn active" onclick="logout()">
+                     <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                 </button>
+              </div>
+           </nav>
     </header>
 
 
@@ -68,7 +67,7 @@
     <section class="hero" id="home">
     <div class="container">
         <h1>Descubre Tu Próxima Aventura</h1>
-        <p>Miles de libros esperándote. Envío gratis en pedidos superiores a $50.000</p>
+        <!-- <p>Miles de libros esperándote. Envío gratis en pedidos superiores a $50.000</p> -->
         <div class="search-bar">
             <input type="text" id="search-input" placeholder="Busca tu libro favorito...">
             <button class="search-btn" onclick="searchBooks()">Buscar</button>
@@ -128,40 +127,26 @@
         ¡Libro agregado al carrito!
     </div>
 
-    <!-- Footer -->
-    <footer>
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h3>Sobre Nosotros</h3>
-                    <ul>
-                        <li><a href="#">Quiénes Somos</a></li>
-                        <li><a href="#">Historia</a></li>
-                        <li><a href="#">Misión</a></li>
-                    </ul>
-                </div>
-                <div class="footer-section">
-                    <h3>Servicio al Cliente</h3>
-                    <ul>
-                        <li><a href="#">Contacto</a></li>
-                        <li><a href="#">Envíos</a></li>
-                        <li><a href="#">Devoluciones</a></li>
-                    </ul>
-                </div>
-                <div class="footer-section">
-                    <h3>Síguenos</h3>
-                    <ul>
-                        <li><a href="#">Facebook</a></li>
-                        <li><a href="#">Twitter</a></li>
-                        <li><a href="#">Instagram</a></li>
-                    </ul>
-                </div>
-            </div>
-            <p>&copy; 2024 BookVerse. Todos los derechos reservados.</p>
-        </div>
-    </footer>
+   
 
     <div id="toast-container"></div>
+
+    <!-- Logout Confirmation Modal -->
+    <div id="logout-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-sign-out-alt"></i> Cerrar sesión</h3>
+                <span class="close" id="logout-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que quieres cerrar sesión?</p>
+            </div>
+            <div class="modal-footer" style="display:flex; gap:8px; justify-content:flex-end;">
+                <button class="btn-secondary" onclick="cancelLogout()">Cancelar</button>
+                <button class="btn-danger" onclick="confirmLogout()">Cerrar sesión</button>
+            </div>
+        </div>
+    </div>
 
     <script src="../JS/Inicio.js"></script>
 </body>

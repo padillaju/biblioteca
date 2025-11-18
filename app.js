@@ -8,16 +8,19 @@ const app = express();
 const PORT = 3000;
 
 // Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Aumentar límite para permitir dataURLs relativamente grandes (avatars en base64)
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 
 
 const cors = require('cors');
 
+// Permitir CORS para desarrollo: reflejar el origen y permitir credenciales.
+// En producción restringe esto a los orígenes confiables.
 app.use(cors({
-  origin: 'http://localhost:5173', // 👈 pon el puerto donde corre tu frontend
-  credentials: true                // 👈 permite enviar cookies de sesión
+  origin: (origin, callback) => callback(null, true),
+  credentials: true
 }));
 
 
@@ -27,11 +30,11 @@ app.use(cors({
 app.use(session({
   secret: 'miclave112233',  
   resave: false,
-  saveUninitialized: false,   // 👈 cambia aquí
+  saveUninitialized: false,   
   cookie: {
-    maxAge: 1000 * 60 * 60,   // 1 hora
+    maxAge: 1000 * 60 * 60,   
     httpOnly: true,
-    sameSite: 'lax'           // 👈 ayuda a mantener la cookie en peticiones entre localhost:3000 y 5173
+    sameSite: 'lax'          
   }
 }));
 
@@ -45,13 +48,6 @@ const db = mysql.createPool({
   database: 'TiendaLibro'
 });
 
-// db.connect(err => {
-//   if (err) {
-//     console.error(' Error al conectar con MySQL:', err);
-//     return;
-//   }
-//   console.log('Conectado a MySQL');
-// });
 
 
 
@@ -63,6 +59,54 @@ db.getConnection((err, connection) => {
     connection.release(); // devolvemos la conexión al pool
   }
 });
+
+// Asegurar que la tabla `libros` exista (previene ER_NO_SUCH_TABLE)
+const createLibrosTable = `
+CREATE TABLE IF NOT EXISTS libros (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  author VARCHAR(255),
+  price DECIMAL(10,2) DEFAULT 0,
+  image MEDIUMTEXT,
+  description TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+`;
+
+// Crear la tabla si no existe
+db.promise().query(createLibrosTable)
+  .then(() => console.log('✅ Tabla `libros` verificada/creada'))
+  .catch(err => console.error('Error creando/verificando tabla libros:', err));
+
+// Crear tabla `usuario` si no existe (útil en entornos de desarrollo)
+const createUsuarioTable = `
+CREATE TABLE IF NOT EXISTS usuario (
+  id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(255),
+  correo VARCHAR(255) UNIQUE,
+  contrasena VARCHAR(255),
+  celular VARCHAR(50),
+  direccion TEXT,
+  rol VARCHAR(50) DEFAULT 'cliente',
+  avatar MEDIUMTEXT,
+  fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+`;
+
+db.promise().query(createUsuarioTable)
+  .then(() => console.log('✅ Tabla `usuario` verificada/creada'))
+  .catch(err => console.error('Error creando/verificando tabla usuario:', err));
+
+// Si la tabla ya existía con la columna `image` corta, intentar modificarla a MEDIUMTEXT.
+// Esto permite almacenar data URLs/base64 largos sin fallar con ER_DATA_TOO_LONG.
+db.promise().query("ALTER TABLE libros MODIFY COLUMN image MEDIUMTEXT")
+  .then(() => console.log('✅ Columna `image` en `libros` asegurada como MEDIUMTEXT'))
+  .catch(err => {
+    // Ignorar errores comunes (por ejemplo si la tabla no existe aún o la columna ya tiene el tipo correcto)
+    if (err && err.code !== 'ER_NO_SUCH_TABLE' && err.errno !== 1146) {
+      console.error('Error al alterar la columna image en libros:', err);
+    }
+  });
 
 
 // Iniciar servidor
@@ -120,12 +164,23 @@ app.post('/login', (req, res) => {
         // Guardar ID del usuario en sesión
         req.session.id_usuario = usuario.id_usuario;
 
+        // Log breve para depuración: confirmar si el avatar viene en la fila
+        try {
+          const avatarInfo = usuario.avatar ? (`length=${String(usuario.avatar).length}`) : 'null';
+          console.log(`Login: usuario=${usuario.id_usuario}, avatar=${avatarInfo}`);
+        } catch (e) {
+          console.log('Login: no se pudo leer avatar', e && e.message);
+        }
+
         res.json({ 
-          success: true, 
-          message: 'Inicio de sesión exitoso',
-          nombre: usuario.nombre,
-          correo: usuario.correo,
-          rol: usuario.rol
+              success: true,
+              message: 'Inicio de sesión exitoso',
+              nombre: usuario.nombre,
+              correo: usuario.correo,
+              rol: usuario.rol,
+              celular: usuario.celular || null,
+              direccion: usuario.direccion || null,
+              avatar: usuario.avatar || null
         });
       } else {
         res.json({ success: false, message: 'Correo o contraseña incorrectos' });
@@ -133,6 +188,85 @@ app.post('/login', (req, res) => {
     }
   );
   });
+
+// Obtener perfil del usuario en sesión
+app.get('/perfil', (req, res) => {
+  const id_usuario = req.session.id_usuario;
+  if (!id_usuario) return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+
+  db.query('SELECT id_usuario, nombre, correo, direccion, celular, rol, avatar FROM usuario WHERE id_usuario = ?', [id_usuario], (err, result) => {
+    if (err) {
+      console.error('Error obteniendo perfil:', err);
+      return res.status(500).json({ success: false, message: 'Error al obtener perfil' });
+    }
+    if (result.length === 0) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    const user = result[0];
+    res.json({ success: true, user });
+  });
+});
+
+// Asegurar columna avatar en tabla usuario (MEDIUMTEXT) para poder guardar dataURLs si fuese necesario
+// Verificar si la columna `avatar` existe en la tabla `usuario`. Si no existe, crearla como MEDIUMTEXT.
+db.promise().query("SHOW COLUMNS FROM usuario LIKE 'avatar'")
+  .then(([rows]) => {
+    if (!rows || rows.length === 0) {
+      return db.promise().query("ALTER TABLE usuario ADD COLUMN avatar MEDIUMTEXT")
+        .then(() => console.log('✅ Columna `avatar` en `usuario` creada como MEDIUMTEXT'))
+        .catch(err => console.error('Error al crear la columna avatar en usuario:', err));
+    } else {
+      console.log('✅ Columna `avatar` ya existe en `usuario`');
+      return null;
+    }
+  })
+  .catch(err => {
+    // Puede suceder si la tabla `usuario` no existe aún o hay permisos insuficientes
+    console.warn('No se pudo verificar/crear la columna avatar en `usuario` (es posible que la tabla no exista aún):', err.message || err);
+  });
+
+// Actualizar perfil del usuario (actualizaciones parciales)
+app.put('/perfil', async (req, res) => {
+  const id_usuario = req.session.id_usuario;
+  if (!id_usuario) return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+
+  const { nombre, email, correo, telefono, celular, direccion, avatar, password } = req.body;
+
+  const fields = [];
+  const values = [];
+
+  // Aceptar varias claves usadas por el frontend
+  if (typeof nombre === 'string') { fields.push('nombre = ?'); values.push(nombre); }
+  if (typeof email === 'string') { fields.push('correo = ?'); values.push(email); }
+  if (typeof correo === 'string') { fields.push('correo = ?'); values.push(correo); }
+  if (typeof telefono === 'string') { fields.push('celular = ?'); values.push(telefono); }
+  if (typeof celular === 'string') { fields.push('celular = ?'); values.push(celular); }
+  if (typeof direccion === 'string') { fields.push('direccion = ?'); values.push(direccion); }
+  if (typeof avatar === 'string') { fields.push('avatar = ?'); values.push(avatar); }
+  if (typeof password === 'string' && password.length > 0) { fields.push('contrasena = ?'); values.push(password); }
+
+  if (fields.length === 0) return res.json({ success: false, message: 'No hay campos para actualizar' });
+
+  try {
+    const sql = `UPDATE usuario SET ${fields.join(', ')} WHERE id_usuario = ?`;
+    values.push(id_usuario);
+    await db.promise().query(sql, values);
+
+    // Devolver perfil actualizado
+    const [rows] = await db.promise().query('SELECT id_usuario, nombre, correo, direccion, celular, rol, avatar FROM usuario WHERE id_usuario = ?', [id_usuario]);
+    const user = rows[0] || null;
+
+    // Log para depuración sobre avatar actualizado
+    try {
+      const avatarInfo = user && user.avatar ? (`length=${String(user.avatar).length}`) : 'null';
+      console.log(`Perfil actualizado: usuario=${id_usuario}, avatar=${avatarInfo}`);
+    } catch (e) {
+      console.log('Perfil actualizado: no se pudo leer avatar', e && e.message);
+    }
+    res.json({ success: true, user });
+  } catch (err) {
+    console.error('Error actualizando perfil:', err);
+    res.status(500).json({ success: false, message: 'Error al actualizar perfil', error: err.sqlMessage || err.message });
+  }
+});
 
 
 // agregar al carrito
@@ -368,6 +502,117 @@ app.put("/carrito/finalizar", async (req, res) => {
   }
 });
 
+// Obtener todos los pedidos (ruta para administradores)
+app.get('/pedidos', async (req, res) => {
+  try {
+    // Traer pedidos junto al nombre del usuario (cliente) para la vista de admin
+    const [rows] = await db.promise().query(
+      `SELECT p.id_pedido, p.id_usuario, p.total, p.estado, p.fecha_creacion, p.libros, u.nombre AS nombre_cliente, u.correo AS correo_cliente
+       FROM pedidos p
+       LEFT JOIN usuario u ON p.id_usuario = u.id_usuario
+       ORDER BY p.fecha_creacion DESC`
+    );
+
+    // Asegurar que 'libros' sea objeto/array
+    const pedidos = rows.map(p => ({
+      ...p,
+      libros: typeof p.libros === 'string' ? JSON.parse(p.libros) : p.libros,
+      nombre_cliente: p.nombre_cliente || null,
+      correo_cliente: p.correo_cliente || null
+    }));
+
+    res.json({ success: true, pedidos });
+  } catch (err) {
+    console.error('Error al obtener pedidos (admin):', err);
+    res.status(500).json({ success: false, message: 'Error al obtener pedidos' });
+  }
+});
+
+
+// ==== RUTAS PARA LIBROS DESTACADOS ====
+// Tabla sugerida en MySQL:
+// CREATE TABLE featured_books (
+//   id INT AUTO_INCREMENT PRIMARY KEY,
+//   title VARCHAR(255) NOT NULL,
+//   author VARCHAR(255),
+//   price DECIMAL(10,2) DEFAULT 0,
+//   image VARCHAR(512),
+//   description TEXT,
+//   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+// );
+
+// Obtener libros destacados
+app.get('/libros', async (req, res) => {
+  try {
+    const [rows] = await db.promise().query('SELECT id, title, author, price, image, description FROM libros ORDER BY created_at DESC');
+    res.json({ success: true, books: rows });
+  } catch (err) {
+    console.error('Error al obtener libros destacados:', err);
+    res.status(500).json({ success: false, message: 'Error al obtener libros destacados' });
+  }
+});
+
+// Obtener un libro por id
+app.get('/libros/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [rows] = await db.promise().query('SELECT id, title, author, price, image, description FROM libros WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Libro no encontrado' });
+    res.json({ success: true, book: rows[0] });
+  } catch (err) {
+    console.error('Error al obtener libro:', err);
+    res.status(500).json({ success: false, message: 'Error al obtener libro' });
+  }
+});
+
+// Agregar libro destacado
+app.post('/libros', async (req, res) => {
+  try {
+    const { title, author, price, image, description } = req.body;
+    const [result] = await db.promise().query(
+      'INSERT INTO libros (title, author, price, image, description) VALUES (?, ?, ?, ?, ?)',
+      [title, author, price || 0, image || null, description || null]
+    );
+
+    res.json({ success: true, id: result.insertId });
+  } catch (err) {
+    console.error('Error al insertar libro destacado:', err);
+    res.status(500).json({ success: false, message: 'Error al insertar libro destacado' });
+  }
+});
+
+// Eliminar libro destacado
+app.delete('/libros/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [result] = await db.promise().query('DELETE FROM libros WHERE id = ?', [id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Libro no encontrado' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error al eliminar libro destacado:', err);
+    res.status(500).json({ success: false, message: 'Error al eliminar libro destacado' });
+  }
+});
+
+// Actualizar libro destacado
+app.put('/libros/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { title, author, price, image, description } = req.body;
+
+    const [result] = await db.promise().query(
+      'UPDATE libros SET title = ?, author = ?, price = ?, image = ?, description = ? WHERE id = ?',
+      [title, author, price || 0, image || null, description || null, id]
+    );
+
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Libro no encontrado' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error al actualizar libro destacado:', err);
+    res.status(500).json({ success: false, message: 'Error al actualizar libro destacado' });
+  }
+});
+
 
 
 
@@ -413,9 +658,18 @@ app.get("/mis-pedidos", async (req, res) => {
 // Obtener solo clientes
   app.get("/cliente", async (req, res) => {
     try {
+      // Devolver fecha de registro (si existe) y la cantidad de pedidos por usuario.
+      // Usa LEFT JOIN con pedidos y GROUP BY para calcular pedidos_count.
       const [rows] = await db.promise().query(
-        "SELECT id_usuario, nombre, correo, direccion, celular FROM usuario WHERE rol = 'cliente'"
+        `SELECT u.id_usuario, u.nombre, u.correo, u.direccion, u.celular, u.rol,
+                u.fecha_creacion, COUNT(p.id_pedido) AS pedidos_count
+         FROM usuario u
+         LEFT JOIN pedidos p ON p.id_usuario = u.id_usuario
+         WHERE u.rol = 'cliente'
+         GROUP BY u.id_usuario, u.nombre, u.correo, u.direccion, u.celular, u.rol, u.fecha_creacion`
       );
+
+      // Si la columna `fecha_creacion` no existe en la tabla `usuario`, su valor vendrá como null.
       res.json(rows);
     } catch (err) {
       console.error(err);
@@ -448,4 +702,28 @@ app.delete('/usuario/:id', (req, res) => {
 // Página de bienvenida
 app.get('/bienvenido', (req, res) => {
   res.send("<h1>Bienvenido a la Biblioteca </h1>");
+});
+
+// Logout explícito: destruir sesión
+app.post('/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      console.warn('Error al destruir sesión:', err);
+      return res.status(500).json({ success: false, message: 'Error al cerrar sesión' });
+    }
+    // Además limpiar cookie de sesión en el cliente
+    res.clearCookie('connect.sid');
+    res.json({ success: true, message: 'Sesión cerrada' });
+  });
+});
+
+// Middleware de manejo de errores: capturar payloads demasiado grandes y devolver JSON
+app.use((err, req, res, next) => {
+  if (err) {
+    if (err.type === 'entity.too.large' || err.status === 413) {
+      console.warn('PayloadTooLarge error al procesar la petición:', err.message || err);
+      return res.status(413).json({ success: false, error: 'PayloadTooLarge', message: 'El cuerpo de la petición es demasiado grande. Reduce el tamaño de la imagen antes de enviarla.' });
+    }
+  }
+  next(err);
 });

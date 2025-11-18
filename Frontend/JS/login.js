@@ -1,8 +1,56 @@
-document.getElementById('formLogin').addEventListener('submit', async (e) => {
-  e.preventDefault();
+const form = document.getElementById('formLogin');
+const correoEl = document.getElementById('correo');
+const passEl = document.getElementById('contrasena');
+const mensajeEl = document.getElementById('mensaje');
+const loginBtn = document.getElementById('loginBtn');
+const correoError = document.getElementById('correo-error');
+const passError = document.getElementById('contrasena-error');
+const togglePass = document.getElementById('togglePassword');
 
-  const correo = document.getElementById('correo').value;
-  const contrasena = document.getElementById('contrasena').value;
+function clearErrors() {
+  correoError.textContent = '';
+  passError.textContent = '';
+  mensajeEl.textContent = '';
+  mensajeEl.className = '';
+}
+
+function isValidEmail(email) {
+  if (!email) return false;
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+if (togglePass) {
+  togglePass.addEventListener('click', () => {
+    const t = passEl.getAttribute('type') === 'password' ? 'text' : 'password';
+    passEl.setAttribute('type', t);
+    togglePass.innerHTML = t === 'text' ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
+  });
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearErrors();
+
+  const correo = correoEl.value && correoEl.value.trim();
+  const contrasena = passEl.value || '';
+
+  let hasError = false;
+  if (!correo || !isValidEmail(correo)) {
+    correoError.textContent = 'Ingresa un correo válido';
+    hasError = true;
+  }
+  if (!contrasena || contrasena.length < 8) {
+    passError.textContent = 'La contraseña debe tener al menos 8 caracteres';
+    hasError = true;
+  }
+  if (hasError) return;
+
+  // Disable button and show spinner
+  loginBtn.disabled = true;
+  loginBtn.classList.add('loading');
+  const originalText = loginBtn.textContent;
+  loginBtn.textContent = 'Entrando...';
 
   try {
     const res = await fetch('/login', {
@@ -11,35 +59,42 @@ document.getElementById('formLogin').addEventListener('submit', async (e) => {
       body: JSON.stringify({ correo, contrasena })
     });
 
-    const data = await res.json();
-    console.log("Respuesta del backend:", data); 
-    document.getElementById('mensaje').textContent = data.message;
+    const data = await res.json().catch(() => ({ success: false, message: 'Respuesta inválida del servidor' }));
+    console.log('Respuesta del backend:', data);
 
-   if (data.success) {
-    // Guarda los datos del usuario en localStorage
-    localStorage.setItem("userSession", JSON.stringify({
-        nombre: data.nombre,
-        email: data.correo,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}`,
-        telefono: data.telefono,
-        direccion: data.direccion,
-        rol: data.rol
-    }));
+    if (data && data.success) {
+      mensajeEl.textContent = data.message || 'Inicio de sesión correcto';
+      mensajeEl.className = 'success';
 
-     localStorage.setItem("isAdmin", data.rol === "admin" ? "true" : "false");
+      // Guarda los datos del usuario en localStorage
+      localStorage.setItem('userSession', JSON.stringify({
+        nombre: data.nombre || data.nombre_usuario || '',
+        email: data.correo || data.email || '',
+        avatar: data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre || '')}`,
+        telefono: data.celular || data.telefono || null,
+        direccion: data.direccion || null,
+        rol: data.rol || data.role || 'cliente'
+      }));
+      localStorage.setItem('isAdmin', (data.rol === 'admin' || data.role === 'admin') ? 'true' : 'false');
 
-
-    setTimeout(() => {
-    if (data.rol === "admin") {
-          window.location.href = "/HTML/admin.html";
-        } else {
-          window.location.href = "/HTML/Inicio.html";
-        }
-      }, 2000);
+      // Short delay to show success message then redirect
+      setTimeout(() => {
+        if (data.rol === 'admin' || data.role === 'admin') window.location.href = '../HTML/admin.html';
+        else window.location.href = '../HTML/Inicio.html';
+      }, 900);
+    } else {
+      // Show server message as credential error
+      const msg = (data && data.message) ? data.message : 'Credenciales incorrectas';
+      mensajeEl.textContent = msg;
+      mensajeEl.className = 'error';
     }
-
   } catch (error) {
-    console.error("Error:", error);
-    document.getElementById('mensaje').textContent = "Error en la conexión";
+    console.error('Error:', error);
+    mensajeEl.textContent = 'Error de conexión. Intenta de nuevo.';
+    mensajeEl.className = 'error';
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.classList.remove('loading');
+    loginBtn.textContent = originalText;
   }
 });

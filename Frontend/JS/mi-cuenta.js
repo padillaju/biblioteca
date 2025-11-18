@@ -148,80 +148,372 @@ document.addEventListener("DOMContentLoaded", () => {
 })
 
 // ===== NAVIGATION =====
-// function goToHome() {
-//   window.location.href = "Inicio.html"
-// }
-
-// function showTab(tabName) {
-//   document.querySelectorAll(".tab-pane").forEach((pane) => {
-//     pane.classList.remove("active")
-//   })
-
-//   document.querySelectorAll(".tab-btn").forEach((btn) => {
-//     btn.classList.remove("active")
-//   })
-
-//   document.getElementById(`${tabName}-tab`).classList.add("active")
+function goToHome() {
+  window.location.href = "Inicio.html";
+}
 
 
 
 
 
-//   // Add active class to clicked tab button
-//   event.target.classList.add("active")
-
-//   switch (tabName) {
-//     case "cart":
-//       renderCart()
-//       break
-//     case "favorites":
-//       renderFavorites()
-//       break
-//     case "orders":
-//       renderOrders()
-//       break
-//     case "profile":
-//       loadProfileForm()
-//       break
-//   }
-// }
 
 // ===== perfil =====
 function loadUserProfile() {
-  const user = JSON.parse(localStorage.getItem("userSession"))
-  document.getElementById("profile-name").textContent = user?.nombre || "Usuario Invitado"
-  document.getElementById("profile-email").textContent = user?.email || "Inicia sesión para más funciones"
-  document.getElementById("profile-phone").textContent = user?.telefono ? `Teléfono: ${user.telefono}` : ""
-  document.getElementById("profile-address").textContent = user?.direccion ? `Dirección: ${user.direccion}` : ""
+  const user = JSON.parse(localStorage.getItem("userSession")) || {}
+  const nameEl = document.getElementById("profile-name")
+  const emailEl = document.getElementById("profile-email")
+  const phoneEl = document.getElementById("profile-phone")
+  const addressEl = document.getElementById("profile-address")
+  const avatarContainer = document.querySelector('.profile-avatar')
+
+  if (nameEl) nameEl.textContent = user.nombre || "Usuario Invitado"
+  if (emailEl) emailEl.textContent = user.email || "Inicia sesión para más funciones"
+  if (phoneEl) phoneEl.textContent = user.telefono ? `Teléfono: ${user.telefono}` : ""
+  if (addressEl) addressEl.textContent = user.direccion ? `Dirección: ${user.direccion}` : ""
+
+  // Mostrar avatar si existe, si no mostrar icono por defecto
+  if (avatarContainer) {
+    if (user.avatar) {
+      avatarContainer.innerHTML = `<img id="profile-avatar-img" src="${user.avatar}" alt="Avatar" style="width:100px;height:100px;object-fit:cover;border-radius:50%;"/>`
+    } else {
+      avatarContainer.innerHTML = `<i class="fas fa-user-circle"></i>`
+    }
+  }
+
+  // Also update preview panel if present
+  const previewName = document.getElementById('preview-name')
+  const previewEmail = document.getElementById('preview-email')
+  const previewPhone = document.getElementById('preview-phone')
+  const previewAddress = document.getElementById('preview-address')
+  const previewAvatarContainer = document.getElementById('preview-avatar-container')
+  const metaName = document.getElementById('meta-name')
+  const metaEmail = document.getElementById('meta-email')
+  const metaPhone = document.getElementById('meta-phone')
+  const metaAddress = document.getElementById('meta-address')
+
+  if (previewName) previewName.textContent = user.nombre || 'Usuario Invitado'
+  if (previewEmail) previewEmail.textContent = user.email || 'Inicia sesión para más funciones'
+  if (previewPhone) previewPhone.textContent = user.telefono ? `Teléfono: ${user.telefono}` : ''
+  if (previewAddress) previewAddress.textContent = user.direccion ? `Dirección: ${user.direccion}` : ''
+
+  if (metaName) metaName.textContent = user.nombre || ''
+  if (metaEmail) metaEmail.textContent = user.email || ''
+  if (metaPhone) metaPhone.textContent = user.telefono || ''
+  if (metaAddress) metaAddress.textContent = user.direccion || ''
+
+  if (previewAvatarContainer) {
+    if (user.avatar) {
+      previewAvatarContainer.innerHTML = `<img id="preview-avatar-img" src="${user.avatar}" alt="Avatar" style="width:120px;height:120px;object-fit:cover;border-radius:50%;"/>`
+    } else {
+      previewAvatarContainer.innerHTML = `<i class="fas fa-user-circle" style="font-size:120px;color:#888"></i>`
+    }
+  }
 }
 
 function loadProfileForm() {
   const user = JSON.parse(localStorage.getItem("userSession")) || {}
 
-  document.getElementById("profile-name-input").value = user.nombre || ""
-  document.getElementById("profile-email-input").value = user.email || ""
-  document.getElementById("profile-phone-input").value = user.telefono || ""
-  document.getElementById("profile-address-input").value = user.direccion || ""
-}
+  const nameInput = document.getElementById("profile-name-input")
+  const emailInput = document.getElementById("profile-email-input")
+  const phoneInput = document.getElementById("profile-phone-input")
+  const addressInput = document.getElementById("profile-address-input")
+  const photoInput = document.getElementById("profile-photo-input")
+  const previewImg = document.getElementById("profile-avatar-preview")
 
-function saveProfile() {
-  const profileData = {
-    nombre: document.getElementById("profile-name-input").value,
-    email: document.getElementById("profile-email-input").value,
-    telefono: document.getElementById("profile-phone-input").value,
-    direccion: document.getElementById("profile-address-input").value,
-    avatar: "https://via.placeholder.com/100x100?text=User",
+  if (nameInput) nameInput.value = user.nombre || ""
+  if (emailInput) emailInput.value = user.email || ""
+  if (phoneInput) phoneInput.value = user.telefono || ""
+  if (addressInput) addressInput.value = user.direccion || ""
+  // Limpiar campos de contraseña por seguridad
+  const currentPassword = document.getElementById('profile-current-password-input')
+  const newPassword = document.getElementById('profile-new-password-input')
+  if (currentPassword) currentPassword.value = ''
+  if (newPassword) newPassword.value = ''
+
+  // Clear any inline field errors
+  clearFieldError('profile-current-password-input')
+  clearFieldError('profile-new-password-input')
+
+  // Mostrar previsualización si hay avatar guardado
+  if (previewImg) {
+    if (user.avatar) {
+      previewImg.src = user.avatar
+      previewImg.style.display = 'block'
+    } else {
+      previewImg.src = ''
+      previewImg.style.display = 'none'
+    }
   }
 
-  if (!profileData.nombre || !profileData.email) {
-    showNotification("Por favor completa al menos el nombre y email", "warning")
-    return
+  // Limpiar el input file si existe
+  if (photoInput) photoInput.value = null
+
+  // Attach live preview listeners for form inputs
+  attachProfileFormListeners()
+}
+
+function updatePreviewFromInputs() {
+  const nameVal = document.getElementById('profile-name-input')?.value || ''
+  const emailVal = document.getElementById('profile-email-input')?.value || ''
+  const phoneVal = document.getElementById('profile-phone-input')?.value || ''
+  const addressVal = document.getElementById('profile-address-input')?.value || ''
+  const previewName = document.getElementById('preview-name')
+  const previewEmail = document.getElementById('preview-email')
+  const previewPhone = document.getElementById('preview-phone')
+  const previewAddress = document.getElementById('preview-address')
+  const metaName = document.getElementById('meta-name')
+  const metaEmail = document.getElementById('meta-email')
+  const metaPhone = document.getElementById('meta-phone')
+  const metaAddress = document.getElementById('meta-address')
+
+  if (previewName) previewName.textContent = nameVal || 'Usuario Invitado'
+  if (previewEmail) previewEmail.textContent = emailVal || 'Inicia sesión para más funciones'
+  if (previewPhone) previewPhone.textContent = phoneVal ? `Teléfono: ${phoneVal}` : ''
+  if (previewAddress) previewAddress.textContent = addressVal ? `Dirección: ${addressVal}` : ''
+
+  if (metaName) metaName.textContent = nameVal || ''
+  if (metaEmail) metaEmail.textContent = emailVal || ''
+  if (metaPhone) metaPhone.textContent = phoneVal || ''
+  if (metaAddress) metaAddress.textContent = addressVal || ''
+}
+
+function attachProfileFormListeners() {
+  const inputs = ['profile-name-input','profile-email-input','profile-phone-input','profile-address-input']
+  inputs.forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.removeEventListener('input', updatePreviewFromInputs)
+    if (el) el.addEventListener('input', updatePreviewFromInputs)
+  })
+
+  // Photo input already triggers preview via change listener; ensure it updates preview avatar container too
+  const photoInput = document.getElementById('profile-photo-input')
+  if (photoInput) {
+    photoInput.removeEventListener('change', updatePreviewFromInputs)
+    photoInput.addEventListener('change', () => {
+      const file = photoInput.files && photoInput.files[0]
+      const previewAvatarContainer = document.getElementById('preview-avatar-container')
+      const previewImg = document.getElementById('profile-avatar-preview')
+      if (file && previewAvatarContainer) {
+        readFileAsDataURL(file).then(dataUrl => {
+          // set main preview avatar container
+          previewAvatarContainer.innerHTML = `<img id="preview-avatar-img" src="${dataUrl}" alt="Avatar" style="width:120px;height:120px;object-fit:cover;border-radius:50%;"/>`
+          if (previewImg) { previewImg.src = dataUrl; previewImg.style.display = 'block' }
+        }).catch(err => console.warn('Error reading file for preview:', err))
+      } else if (previewAvatarContainer) {
+        // if cleared file, restore from stored userSession
+        const existing = JSON.parse(localStorage.getItem('userSession')) || {}
+        if (existing.avatar) {
+          previewAvatarContainer.innerHTML = `<img id="preview-avatar-img" src="${existing.avatar}" alt="Avatar" style="width:120px;height:120px;object-fit:cover;border-radius:50%;"/>`
+          if (previewImg) { previewImg.src = existing.avatar; previewImg.style.display = 'block' }
+        } else {
+          previewAvatarContainer.innerHTML = `<i class="fas fa-user-circle" style="font-size:120px;color:#888"></i>`
+          if (previewImg) { previewImg.src = ''; previewImg.style.display = 'none' }
+        }
+      }
+    })
   }
 
-  localStorage.setItem("userSession", JSON.stringify(profileData))
-  loadUserProfile()
-  showNotification("Perfil actualizado correctamente", "success")
+  // Clear validation errors while the user types
+  const emailInput = document.getElementById('profile-email-input')
+  const phoneInput = document.getElementById('profile-phone-input')
+  const newPwdInput = document.getElementById('profile-new-password-input')
+  if (emailInput) {
+    emailInput.removeEventListener('input', () => clearFieldError('profile-email-input'))
+    emailInput.addEventListener('input', () => clearFieldError('profile-email-input'))
+  }
+  if (phoneInput) {
+    phoneInput.removeEventListener('input', () => clearFieldError('profile-phone-input'))
+    phoneInput.addEventListener('input', () => clearFieldError('profile-phone-input'))
+  }
+  if (newPwdInput) {
+    newPwdInput.removeEventListener('input', () => clearFieldError('profile-new-password-input'))
+    newPwdInput.addEventListener('input', () => clearFieldError('profile-new-password-input'))
+  }
 }
+
+// Validación de email con blacklist para correos de prueba
+function isValidEmail(email) {
+  if (!email || typeof email !== 'string') return false
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!re.test(email)) return false
+  const banned = /example|test|prueba|dummy|fake|temporal|correo-de-prueba|pruebas/i
+  if (banned.test(email)) return false
+  return true
+}
+
+// Helper: leer archivo como dataURL (Promise)
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+// Note: password hashing was removed from client-side to match server login expectations.
+// Storing/handling raw passwords in the client is not recommended for production.
+// For now we keep password handling simple to remain compatible with the existing backend.
+
+async function saveProfile() {
+  // Clear previous inline errors
+  clearFieldError('profile-current-password-input')
+  clearFieldError('profile-new-password-input')
+  clearFieldError('profile-photo-input')
+
+  const name = document.getElementById("profile-name-input")?.value
+  const email = document.getElementById("profile-email-input")?.value
+  const phone = document.getElementById("profile-phone-input")?.value
+  const address = document.getElementById("profile-address-input")?.value
+  const photoInput = document.getElementById("profile-photo-input")
+  const currentPwdInput = document.getElementById('profile-current-password-input')
+  const newPwdInput = document.getElementById('profile-new-password-input')
+  const currentPwdValue = currentPwdInput?.value || ''
+  const newPwdValue = newPwdInput?.value || ''
+
+  const existing = JSON.parse(localStorage.getItem('userSession')) || {}
+
+  try {
+    // If user provided current password but not new password, prompt to enter new one
+    if (currentPwdValue && !newPwdValue) {
+      showFieldError('profile-new-password-input', 'Ingresa la nueva contraseña')
+      return
+    }
+
+    // Validaciones: email, telefono y longitud de contraseña
+    if (email && email.trim() !== '') {
+      if (!isValidEmail(email.trim())) {
+        showFieldError('profile-email-input', 'Correo inválido o de prueba no permitido')
+        return
+      }
+    }
+
+    if (phone && phone.trim() !== '') {
+      // aceptar sólo dígitos y exacto 10
+      const digits = phone.replace(/\D/g, '')
+      if (digits.length !== 10) {
+        showFieldError('profile-phone-input', 'El celular debe contener exactamente 10 dígitos')
+        return
+      }
+    }
+
+    if (newPwdValue && newPwdValue.length < 8) {
+      showFieldError('profile-new-password-input', 'La contraseña debe tener al menos 8 caracteres')
+      return
+    }
+
+    // Build payload with only changed fields to avoid sending large, unchanged avatar data
+    const updatePayload = {}
+
+    if (typeof name === 'string' && name.trim() !== '' && name.trim() !== (existing.nombre || '')) updatePayload.nombre = name.trim()
+    if (typeof email === 'string' && email.trim() !== '' && email.trim() !== (existing.email || existing.correo || '')) updatePayload.correo = email.trim()
+    if (typeof phone === 'string' && phone.trim() !== '' && phone.trim() !== (existing.telefono || existing.celular || '')) updatePayload.celular = phone.trim()
+    if (typeof address === 'string' && address.trim() !== '' && address.trim() !== (existing.direccion || '')) updatePayload.direccion = address.trim()
+
+    // Manejar cambio de contraseña: si se proporcionó nueva contraseña
+    if (newPwdValue) {
+      // Si ya existe password almacenada en localStorage (no común), validar con la actual
+      if (existing.password) {
+        if (!currentPwdValue) {
+          showFieldError('profile-current-password-input', 'Ingresa tu contraseña actual para cambiarla')
+          return
+        }
+        if (currentPwdValue !== existing.password) {
+          showFieldError('profile-current-password-input', 'Contraseña actual incorrecta')
+          return
+        }
+      }
+
+      // Enviar la contraseña en texto plano (el backend actual espera contrasena en texto)
+      updatePayload.password = newPwdValue
+    }
+
+    // Sólo añadir avatar si el usuario seleccionó un nuevo archivo
+    if (photoInput && photoInput.files && photoInput.files[0]) {
+      const file = photoInput.files[0]
+      const dataUrl = await readFileAsDataURL(file)
+      updatePayload.avatar = dataUrl
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      showNotification('No hay cambios para guardar', 'info')
+      return
+    }
+
+    // Enviar sólo los campos cambiados al backend
+    const resp = await fetch('http://localhost:3000/perfil', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatePayload)
+    })
+
+    if (!resp.ok) {
+      // Try to parse JSON error body, or show generic
+      let parsed = null
+      try { parsed = await resp.json() } catch (e) { /* ignore */ }
+      const msg = (parsed && parsed.message) ? parsed.message : `Error del servidor: ${resp.status}`
+      showNotification(msg, 'warning')
+      return
+    }
+
+    const result = await resp.json()
+    if (!result || !result.success) {
+      const msg = (result && result.message) ? result.message : 'Error al guardar perfil en servidor'
+      showNotification(msg, 'warning')
+      return
+    }
+
+    // Actualizar localStorage con la versión del servidor (más fiable)
+    const serverUser = result.user || {}
+    const currentStored = JSON.parse(localStorage.getItem('userSession')) || {}
+    const toStore = Object.assign({}, currentStored, {
+      nombre: serverUser.nombre || currentStored.nombre,
+      email: serverUser.correo || serverUser.email || currentStored.email,
+      telefono: serverUser.celular || serverUser.telefono || currentStored.telefono,
+      direccion: serverUser.direccion || currentStored.direccion,
+      avatar: serverUser.avatar || currentStored.avatar
+    })
+
+    localStorage.setItem('userSession', JSON.stringify(toStore))
+    loadUserProfile()
+    showNotification('Perfil actualizado correctamente', 'success')
+
+    // Limpiar campos de contraseña y errores
+    if (currentPwdInput) currentPwdInput.value = ''
+    if (newPwdInput) newPwdInput.value = ''
+    clearFieldError('profile-current-password-input')
+    clearFieldError('profile-new-password-input')
+
+    // actualizar preview si existe y el avatar cambió
+    const previewImg = document.getElementById('profile-avatar-preview')
+    if (previewImg && updatePayload.avatar) { previewImg.src = updatePayload.avatar; previewImg.style.display = 'block' }
+
+  } catch (err) {
+    console.error('Error guardando perfil:', err)
+    showNotification('Error al guardar perfil', 'warning')
+  }
+}
+
+// Mostrar previsualización cuando el usuario selecciona una imagen
+document.addEventListener('change', (e) => {
+  if (e.target && e.target.id === 'profile-photo-input') {
+    const file = e.target.files && e.target.files[0]
+    const previewImg = document.getElementById('profile-avatar-preview')
+    if (!previewImg) return
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = function(ev) {
+        previewImg.src = ev.target.result
+        previewImg.style.display = 'block'
+      }
+      reader.readAsDataURL(file)
+    } else {
+      previewImg.src = ''
+      previewImg.style.display = 'none'
+    }
+  }
+})
 
 function editProfile() {
   showTab("profile")
@@ -236,225 +528,57 @@ function editProfile() {
 }
 
 function logout() {
-  if (confirm("¿Estás seguro de que quieres cerrar sesión?")) {
-    localStorage.removeItem("userSession")
-    showNotification("Sesión cerrada correctamente", "info")
-    setTimeout(() => {
-      goToHome()
-    }, 1500)
+  // // Mostrar modal de confirmación de logout (reemplaza confirm())
+  const modal = document.getElementById('logout-modal')
+  if (modal) modal.style.display = 'flex'
+}
+
+function cancelLogout() {
+  const modal = document.getElementById('logout-modal')
+  if (modal) modal.style.display = 'none'
+}
+
+async function confirmLogout() {
+  // Llamar al backend para destruir la sesión
+  try {
+    const modal = document.getElementById('logout-modal')
+    // disable buttons to avoid double clicks
+    const footerButtons = modal ? modal.querySelectorAll('button') : []
+    footerButtons.forEach(b => b.disabled = true)
+
+    await fetch('http://localhost:3000/logout', {
+      method: 'POST',
+      credentials: 'include'
+    })
+  } catch (err) {
+    console.warn('Logout API failed:', err)
+  } finally {
+    // Ocultar modal
+    const modal = document.getElementById('logout-modal')
+    if (modal) modal.style.display = 'none'
+
+    // Limpiar sesión local
+    localStorage.removeItem('userSession')
+    // Opcional: limpiar carrito y estado de UI
+    // localStorage.removeItem('bookCart')
+
+    // Actualizar UI local y mostrar confirmación en esta misma vista
+    try { loadUserProfile() } catch (e) { /* ignore */ }
+    // Redirect to login page without showing any toast/notification
+    try { window.location.href = 'login.html' } catch (e) { /* ignore */ }
   }
 }
 
-
-// ====procesar pago=====
-// function proceedToCheckout() {
-//   const cart = getCart()
-//   if (cart.length === 0) {
-//     showNotification("Tu carrito está vacío", "warning")
-//     return
-//   }
-
-//   // Populate checkout modal
-//   let checkoutItemsHtml = ""
-//   let total = 0
-
-//   cart.forEach((book) => {
-//     const price =
-//       typeof book.price === "number" ? book.price : Number.parseFloat(book.price.replace(/[^0-9.-]+/g, "")) || 0
-//     const itemTotal = price * book.quantity
-//     total += itemTotal
-
-//     checkoutItemsHtml += `
-//             <div class="checkout-item">
-//                 <span>${book.title} x${book.quantity}</span>
-//                 <span>$${itemTotal.toLocaleString()}</span>
-//             </div>
-//         `
-//   })
-
-//   document.getElementById("checkout-items").innerHTML = checkoutItemsHtml
-//   document.getElementById("checkout-total").textContent = `$${total.toLocaleString()}`
-
-//   // Pre-fill with profile data if available
-//   const user = JSON.parse(localStorage.getItem("userSession"))
-//   if (user) {
-//     document.getElementById("checkout-name").value = user.nombre || ""
-//     document.getElementById("checkout-email").value = user.email || ""
-//     document.getElementById("checkout-phone").value = user.telefono || ""
-//     document.getElementById("checkout-address").value = user.direccion || ""
-//   }
-
-//   document.getElementById("checkout-modal").style.display = "block"
-// }
-
-// function closeCheckoutModal() {
-//   document.getElementById("checkout-modal").style.display = "none"
-// }
-
-// function confirmOrder() {
-//   const name = document.getElementById("checkout-name").value
-//   const email = document.getElementById("checkout-email").value
-//   const phone = document.getElementById("checkout-phone").value
-//   const address = document.getElementById("checkout-address").value
-
-//   if (!name || !email || !phone || !address) {
-//     showNotification("Por favor completa todos los campos", "warning")
-//     return
-//   }
-
-//   const cart = getCart()
-//   const total = cart.reduce((sum, item) => {
-//     const price =
-//       typeof item.price === "number" ? item.price : Number.parseFloat(item.price.replace(/[^0-9.-]+/g, "")) || 0
-//     return sum + price * item.quantity
-//   }, 0)
-
-//   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
-
-//   // Create order
-//   const order = {
-//     id: Date.now().toString(),
-//     date: new Date().toLocaleDateString(),
-//     items: cart,
-//     itemCount: itemCount,
-//     total: total,
-//     status: "completed",
-//     customerInfo: {
-//       name: name,
-//       email: email,
-//       phone: phone,
-//       address: address,
-//     },
-//   }
-
-//   // Save order and clear cart
-//   saveOrder(order)
-//   localStorage.removeItem("bookCart")
-//   updateAllCounts()
-//   renderCart()
-
-//   closeCheckoutModal()
-//   showNotification("¡Pedido realizado con éxito!", "success")
-
-//   // Switch to orders tab to show the new order
-//   setTimeout(() => {
-//     showTab("orders")
-//     document.querySelectorAll(".tab-btn").forEach((btn) => {
-//       if (btn.textContent.includes("Mis Pedidos")) {
-//         btn.classList.add("active")
-//       } else {
-//         btn.classList.remove("active")
-//       }
-//     })
-//   }, 1500)
-// }
+// Conectar la X del modal para cerrarlo (si existe)
+document.addEventListener('DOMContentLoaded', () => {
+  const closeX = document.getElementById('logout-modal-close')
+  if (closeX) closeX.addEventListener('click', () => {
+    const modal = document.getElementById('logout-modal')
+    if (modal) modal.style.display = 'none'
+  })
+})
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// ===== CART FUNCTIONALITY =====
-// function getCart() {
-//   const cart = localStorage.getItem("bookCart")
-//   return cart ? JSON.parse(cart) : []
-// }
-
-// function saveCart(cart) {
-//   localStorage.setItem("bookCart", JSON.stringify(cart))
-//   updateAllCounts()
-//   renderCart()
-// }
-
-
-// function renderCart() {
-//   const cart = getCart()
-//   const cartItems = document.getElementById("cart-items")
-//   const cartSummary = document.getElementById("cart-summary")
-//   const clearCartBtn = document.getElementById("clear-cart-btn")
-
-//   if (cart.length === 0) {
-//     cartItems.innerHTML = `
-//             <div class="empty-state">
-//                 <i class="fas fa-shopping-cart"></i>
-//                 <h3>Tu carrito está vacío</h3>
-//                 <p>Explora nuestros libros y añade algunos a tu carrito</p>
-//                 <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
-//             </div>
-//         `
-//     cartSummary.style.display = "none"
-//     clearCartBtn.style.display = "none"
-//   } else {
-//     clearCartBtn.style.display = "block"
-//     cartSummary.style.display = "block"
-
-//     let html = ""
-//     let subtotal = 0
-
-//     cart.forEach((book, index) => {
-//       const price =
-//         typeof book.price === "number" ? book.price : Number.parseFloat(book.price.replace(/[^0-9.-]+/g, "")) || 0
-//       const itemTotal = price * book.quantity
-//       subtotal += itemTotal
-
-//       html += `
-//                 <div class="item-card">
-//                     <div class="item-header">
-//                         <img src="${book.image || book.imageUrl}" alt="${book.title}" class="item-image">
-//                         <div class="item-info">
-//                             <h3 class="item-title">${book.title}</h3>
-//                             <p class="item-author">por ${book.author || book.authors}</p>
-//                             <p class="item-price">$${price.toLocaleString()}</p>
-//                         </div>
-//                     </div>
-//                     <div class="quantity-controls">
-//                         <button class="quantity-btn" onclick="updateQuantity(${index}, -1)">-</button>
-//                         <span class="quantity">${book.quantity}</span>
-//                         <button class="quantity-btn" onclick="updateQuantity(${index}, 1)">+</button>
-//                     </div>
-//                     <div class="item-actions">
-//                         <div style="font-weight: bold; color: #667eea;">Total: $${itemTotal.toLocaleString()}</div>
-//                         <button class="btn-danger btn-small" onclick="removeFromCart(${index})">
-//                             <i class="fas fa-trash"></i> Eliminar
-//                         </button>
-//                     </div>
-//                 </div>
-//             `
-//     })
-
-//     cartItems.innerHTML = html
-
-//     // Update summary
-//     // ...dentro de renderCart()...
-//     // Update summary
-//     const shipping = subtotal >= 50000 ? 0 : 5000
-//     // Asegura que subtotal y shipping sean números
-//     const total = Number(subtotal) + Number(shipping)
-
-//     document.getElementById("cart-subtotal").textContent = `$${subtotal.toLocaleString()}`
-//     document.getElementById("cart-shipping").textContent = shipping === 0 ? "Gratis" : `$${shipping.toLocaleString()}`
-//     document.getElementById("cart-total").textContent = `$${total.toLocaleString()}`}
-// }
 
 function proceedToCheckout() {
   fetch('http://localhost:3000/carrito', { credentials: 'include' })
@@ -502,63 +626,6 @@ function closeCheckoutModal() {
   if (modal) modal.style.display = "none";
 }
 
-// function confirmOrder() {
-//   alert("Pedido confirmado ✅");
-//   closeCheckoutModal();
-// }
-
-
-// function loadOrders() {
-//   fetch("http://localhost:3000/pedidos", { credentials: "include" })
-//     .then(res => res.json())
-//     .then(data => {
-//       const ordersContainer = document.getElementById("orders-items");
-
-//       if (!data.success || data.pedidos.length === 0) {
-//         ordersContainer.innerHTML = `
-//           <div class="empty-state">
-//             <i class="fas fa-box"></i>
-//             <h3>No tienes pedidos</h3>
-//             <p>Tus pedidos aparecerán aquí una vez que realices una compra</p>
-//             <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
-//           </div>
-//         `;
-//         return;
-//       }
-
-//       // Si hay pedidos
-//       let html = "";
-//       data.pedidos.forEach(pedido => {
-//         let itemsHTML = pedido.items
-//           .map(
-//             item => `
-//               <li>${item.titulo} (x${item.cantidad}) - $${item.precio.toLocaleString()}</li>
-//             `
-//           )
-//           .join("");
-
-//         html += `
-//           <div class="order-card">
-//             <h3>Pedido #${pedido.id}</h3>
-//             <p><strong>Fecha:</strong> ${pedido.fecha}</p>
-//             <p><strong>Estado:</strong> ${pedido.estado}</p>
-//             <ul>${itemsHTML}</ul>
-//             <p class="order-total"><strong>Total:</strong> $${pedido.total.toLocaleString()}</p>
-//           </div>
-//         `;
-//       });
-
-//       ordersContainer.innerHTML = html;
-//     })
-//     .catch(err => {
-//       console.error("Error al cargar pedidos:", err);
-//     });
-// }
-
-// // Cargar los pedidos cuando se abre la pestaña "Mis Pedidos"
-// document.addEventListener("DOMContentLoaded", () => {
-//   loadOrders();
-// });
 
 function confirmOrder() {
   const name = document.getElementById("checkout-name").value.trim();
@@ -640,20 +707,28 @@ function confirmOrder() {
 
 
 function showTab(tabName) {
-  document.querySelectorAll(".tab-pane").forEach((pane) => {
-    pane.classList.remove("active");
-    if (tabName === "favorites") {
-  renderFavorites();
-}
+  // Ocultar todas las pestañas de contenido
+  document.querySelectorAll(".tab-pane").forEach((pane) => pane.classList.remove("active"));
 
+  // Mostrar la pestaña seleccionada
+  const targetPane = document.getElementById(`${tabName}-tab`);
+  if (targetPane) targetPane.classList.add("active");
+
+  // Actualizar la clase "active" en los botones de las pestañas
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    const onclickAttr = btn.getAttribute("onclick") || "";
+    const matchesSingle = onclickAttr.includes(`showTab('${tabName}')`);
+    const matchesDouble = onclickAttr.includes(`showTab(\"${tabName}\")`);
+    if (matchesSingle || matchesDouble) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
   });
 
-  document.getElementById(`${tabName}-tab`).classList.add("active");
-
-  // 🔹 Si el usuario abre la pestaña de pedidos, cargar los pedidos
-  if (tabName === "orders") {
-    loadOrders();
-  }
+  // Acciones adicionales por pestaña
+  if (tabName === "favorites") renderFavorites();
+  if (tabName === "orders") loadOrders();
 }
 
 function loadOrders() {
@@ -907,54 +982,7 @@ function saveFavorites(favorites) {
   renderFavorites()
 }
 
-// function renderFavorites() {
-//   const favorites = getFavorites()
-//   const favoritesItems = document.getElementById("favorites-items")
-//   const clearFavoritesBtn = document.getElementById("clear-favorites-btn")
 
-//   if (favorites.length === 0) {
-//     favoritesItems.innerHTML = `
-//             <div class="empty-state">
-//                 <i class="fas fa-heart"></i>
-//                 <h3>No tienes favoritos</h3>
-//                 <p>Guarda libros que te interesen para encontrarlos fácilmente</p>
-//                 <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
-//             </div>
-//         `
-//     clearFavoritesBtn.style.display = "none"
-//   } else {
-//     clearFavoritesBtn.style.display = "block"
-
-//     let html = ""
-//     favorites.forEach((book, index) => {
-//       const price =
-//         typeof book.price === "number" ? book.price : Number.parseFloat(book.price.replace(/[^0-9.-]+/g, "")) || 0
-
-//       html += `
-//                 <div class="item-card">
-//                     <div class="item-header">
-//                         <img src="${book.image || book.imageUrl}" alt="${book.title}" class="item-image">
-//                         <div class="item-info">
-//                             <h3 class="item-title">${book.title}</h3>
-//                             <p class="item-author">por ${book.author || book.authors}</p>
-//                             <p class="item-price">$${price.toLocaleString()}</p>
-//                         </div>
-//                     </div>
-//                     <div class="item-actions">
-//                         <button class="btn-primary btn-small" onclick="addToCartFromFavorites('${book.id}', '${book.title.replace(/'/g, "\\'")}', '${(book.author || book.authors).replace(/'/g, "\\'")}', '${price}', '${book.image || book.imageUrl}')">
-//                             <i class="fas fa-shopping-cart"></i> Al Carrito
-//                         </button>
-//                         <button class="btn-danger btn-small" onclick="removeFromFavorites(${index})">
-//                             <i class="fas fa-heart-broken"></i> Quitar
-//                         </button>
-//                     </div>
-//                 </div>
-//             `
-//     })
-
-//     favoritesItems.innerHTML = html
-//   }
-// }
 
 function addToCartFromFavorites(bookId, title, authors, price, imageUrl) {
   const newBook = {
@@ -1003,6 +1031,17 @@ function getOrders() {
   return orders ? JSON.parse(orders) : []
 }
 
+// Obtener carrito guardado en localStorage (fallback cuando no hay sesión)
+function getCart() {
+  const cart = localStorage.getItem('bookCart') || localStorage.getItem('bookCart')
+  try {
+    return cart ? JSON.parse(cart) : []
+  } catch (e) {
+    console.warn('getCart parse error', e)
+    return []
+  }
+}
+
 function saveOrder(order) {
   const orders = getOrders()
   orders.unshift(order) // Add to beginning of array
@@ -1011,75 +1050,48 @@ function saveOrder(order) {
   renderOrders()
 }
 
-// function renderOrders() {
-//   const orders = getOrders()
-//   const ordersItems = document.getElementById("orders-items")
 
-//   if (orders.length === 0) {
-//     ordersItems.innerHTML = `
-//             <div class="empty-state">
-//                 <i class="fas fa-box"></i>
-//                 <h3>No tienes pedidos</h3>
-//                 <p>Tus pedidos aparecerán aquí una vez que realices una compra</p>
-//                 <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
-//             </div>
-//         `
-//   } else {
-//     let html = ""
-//     orders.forEach((order, index) => {
-//       const statusClass =
-//         order.status === "completed" ? "completed" : order.status === "pending" ? "pending" : "cancelled"
-//       const statusText =
-//         order.status === "completed" ? "Completado" : order.status === "pending" ? "Pendiente" : "Cancelado"
-
-//       html += `
-//                 <div class="order-card">
-//                     <div class="order-header">
-//                         <div>
-//                             <div class="order-number">Pedido #${order.id}</div>
-//                             <div style="color: #666; font-size: 0.9rem;">${order.date}</div>
-//                         </div>
-//                         <div class="order-status ${statusClass}">${statusText}</div>
-//                     </div>
-//                     <div class="order-items">
-//                         <strong>Artículos:</strong> ${order.itemCount} | 
-//                         <strong>Total:</strong> $${order.total.toLocaleString()}
-//                     </div>
-//                     <div style="margin-top: 1rem;">
-//                         <strong>Entrega:</strong> ${order.customerInfo.name} - ${order.customerInfo.address}
-//                     </div>
-//                 </div>
-//             `
-//     })
-
-//     ordersItems.innerHTML = html
-//   }
-// }
-
-// ===== CHECKOUT FUNCTIONALITY =====
 
 
 // ===== UTILITY FUNCTIONS =====
 function updateAllCounts() {
-  const cart = getCart()
-  const favorites = getFavorites()
-  const orders = getOrders()
+  // First: populate quickly from localStorage so UI is responsive
+  const localCart = getCart() || []
+  const localFavorites = getFavorites() || []
+  const localOrders = getOrders() || []
 
-  // Update header cart count
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0)
-  const headerCartCount = document.getElementById("header-cart-count")
-  if (headerCartCount) {
-    headerCartCount.textContent = cartCount
-  }
+  const headerCartCount = document.getElementById('header-cart-count')
+  const cartStat = document.getElementById('cart-stat')
+  const favoritesStat = document.getElementById('favorites-stat')
+  const ordersStat = document.getElementById('orders-stat')
 
-  // Update stats
-  const cartStat = document.getElementById("cart-stat")
-  const favoritesStat = document.getElementById("favorites-stat")
-  const ordersStat = document.getElementById("orders-stat")
+  const localCartCount = (localCart || []).reduce((t, it) => t + (it.quantity || it.cantidad || 0), 0)
+  if (headerCartCount) headerCartCount.textContent = localCartCount
+  if (cartStat) cartStat.textContent = localCartCount
+  if (favoritesStat) favoritesStat.textContent = localFavorites.length
+  if (ordersStat) ordersStat.textContent = localOrders.length
 
-  if (cartStat) cartStat.textContent = cartCount
-  if (favoritesStat) favoritesStat.textContent = favorites.length
-  if (ordersStat) ordersStat.textContent = orders.length
+  // Then: try to fetch authoritative counts from backend if session cookie exists
+  // We don't block UI on these requests; if they succeed we overwrite the counts.
+  fetch('http://localhost:3000/carrito', { credentials: 'include' })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.success && Array.isArray(data.items)) {
+        const serverCartCount = data.items.reduce((t, it) => t + (it.cantidad || it.cantidad === 0 ? Number(it.cantidad) : (it.quantity || 0)), 0)
+        if (headerCartCount) headerCartCount.textContent = serverCartCount
+        if (cartStat) cartStat.textContent = serverCartCount
+      }
+    })
+    .catch(() => { /* ignore, keep local values */ })
+
+  fetch('http://localhost:3000/mis-pedidos', { credentials: 'include' })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.success && Array.isArray(data.pedidos)) {
+        if (ordersStat) ordersStat.textContent = data.pedidos.length
+      }
+    })
+    .catch(() => { /* ignore, keep local values */ })
 }
 
 function showNotification(message, type = "success") {
@@ -1100,12 +1112,42 @@ function showNotification(message, type = "success") {
   }, 3000)
 }
 
+// Show an inline error message under a specific input
+function showFieldError(inputId, message) {
+  try {
+    clearFieldError(inputId)
+    const input = document.getElementById(inputId)
+    if (!input) return
+    const err = document.createElement('div')
+    err.className = 'field-error'
+    err.id = inputId + '-error'
+    err.style.color = '#dc3545'
+    err.style.fontSize = '0.9rem'
+    err.style.marginTop = '6px'
+    err.textContent = message
+    input.parentNode.appendChild(err)
+  } catch (e) {
+    console.warn('showFieldError failed', e)
+  }
+}
+
+function clearFieldError(inputId) {
+  const existing = document.getElementById(inputId + '-error')
+  if (existing && existing.parentNode) existing.parentNode.removeChild(existing)
+}
+
 // ===== EVENT LISTENERS =====
 // Close modal when clicking outside
 window.onclick = (event) => {
   const modal = document.getElementById("checkout-modal")
   if (event.target === modal) {
     closeCheckoutModal()
+  }
+
+  // Also close logout modal when clicking outside
+  const logoutModal = document.getElementById('logout-modal')
+  if (logoutModal && event.target === logoutModal) {
+    logoutModal.style.display = 'none'
   }
 }
 
