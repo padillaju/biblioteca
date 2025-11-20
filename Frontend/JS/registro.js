@@ -101,6 +101,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok && data.success) {
         mensaje.textContent = data.mensaje || 'Registro exitoso';
         mensaje.className = 'success';
+        try {
+          localStorage.removeItem('bookFavorites');
+          localStorage.removeItem('favorites');
+        } catch (e) { /* ignore */ }
         setTimeout(() => {
           window.location.href = '../HTML/login.html';
         }, 1200);
@@ -114,6 +118,16 @@ document.addEventListener('DOMContentLoaded', () => {
       mensaje.className = 'error';
     }
   });
+
+  // Mostrar/ocultar contraseña (botón ojo) — igual que en login.js
+  const togglePass = document.getElementById('togglePassword');
+  if (togglePass) {
+    togglePass.addEventListener('click', () => {
+      const t = contrasenaEl.getAttribute('type') === 'password' ? 'text' : 'password';
+      contrasenaEl.setAttribute('type', t);
+      togglePass.innerHTML = t === 'text' ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
+    });
+  }
 
   // Limpiar errores al escribir
   [nombreEl, correoEl, contrasenaEl, celularEl, direccionEl].forEach((input) => {
