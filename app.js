@@ -272,7 +272,7 @@ app.put('/perfil', async (req, res) => {
 // agregar al carrito
 app.post("/carrito/agregar", async (req, res) => {
   try {
-    const { libro_id_api, titulo, cantidad, precio_unitario, imagen } = req.body;
+    let { libro_id_api, titulo, cantidad, precio_unitario, imagen } = req.body;
     const id_usuario = req.session.id_usuario;
 
     if (!id_usuario) {
@@ -297,6 +297,19 @@ app.post("/carrito/agregar", async (req, res) => {
     }
 
     // Insertar item en carrito
+    // Normalizar/validar payload para evitar errores SQL por tipos/longitudes
+    try {
+      cantidad = Number.parseInt(cantidad) || 1
+    } catch (e) { cantidad = 1 }
+    try { precio_unitario = Number.parseFloat(String(precio_unitario).replace(/[^0-9.-]+/g, '')) || 0 } catch (e) { precio_unitario = 0 }
+    // Limitar longitud de título e imagen para evitar errores de columna demasiado larga
+    if (typeof titulo === 'string') titulo = titulo.substring(0, 255)
+    if (typeof libro_id_api !== 'string') libro_id_api = String(libro_id_api || '')
+    if (typeof imagen === 'string') imagen = imagen.substring(0, 200000) // recortar si es dataURL excesivo
+
+    // Log payload mínimo para depuración
+    console.log('Agregar carrito payload:', { id_usuario, id_carrito, libro_id_api, titulo: titulo && titulo.slice(0,40), cantidad, precio_unitario })
+
     await db.promise().query(
       "INSERT INTO carrito_items (id_carrito, libro_id_api, titulo, cantidad, precio_unitario, imagen) VALUES (?, ?, ?, ?, ?, ?)",
       [id_carrito, libro_id_api, titulo, cantidad, precio_unitario, imagen]

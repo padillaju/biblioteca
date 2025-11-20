@@ -1,84 +1,242 @@
 
 
 function loadCart() {
-    fetch('http://localhost:3000/carrito', { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => {
-            const cartItemsContainer = document.getElementById('cart-items');
-            const cartSummary = document.getElementById('cart-summary');
-            const clearCartBtn = document.getElementById('clear-cart-btn');
-            const cartStat = document.getElementById('cart-stat');
+  fetch('http://localhost:3000/carrito', { credentials: 'include' })
+    .then(res => res.json())
+    .then(data => {
+      const cartItemsContainer = document.getElementById('cart-items');
+      const cartSummary = document.getElementById('cart-summary');
+      const clearCartBtn = document.getElementById('clear-cart-btn');
+      const cartStat = document.getElementById('cart-stat');
 
-            if (data.success && data.items.length > 0) {
-                // Agrupar items por libro_id_api
-                const groupedItems = {};
-                data.items.forEach(item => {
-                    if (!groupedItems[item.libro_id_api]) {
-                        groupedItems[item.libro_id_api] = {
-                            ...item,
-                            cantidad: item.cantidad
-                        };
-                    } else {
-                        groupedItems[item.libro_id_api].cantidad += item.cantidad;
-                    }
-                });
-
-                let html = '';
-                let subtotal = 0;
-                let totalItems = 0;
-
-                Object.values(groupedItems).forEach((item, index) => {
-                    const itemTotal = item.precio_unitario * item.cantidad;
-                    subtotal += itemTotal;
-                    totalItems += item.cantidad;
-
-                    html += `
-                        <div class="item-card">
-                            <div class="item-header">
-                                <img src="${item.imagen}" alt="${item.titulo}" class="item-image">
-                                <div class="item-info">
-                                    <h3 class="item-title">${item.titulo}</h3>
-                                    <p class="item-author">por Autor Desconocido</p>
-                                    <p class="item-price">$${item.precio_unitario.toLocaleString()}</p>
-                                </div>
-                            </div>
-                            <div class="quantity-controls">
-                                <button class="quantity-btn" onclick="updateQuantity('${item.libro_id_api}', -1)">-</button>
-                                <span class="quantity">${item.cantidad}</span>
-                                <button class="quantity-btn" onclick="updateQuantity('${item.libro_id_api}', 1)">+</button>
-                            </div>
-                            <div class="item-actions">
-                                <div style="font-weight: bold; color: #667eea;">Total: $${itemTotal.toLocaleString()}</div>
-                                <button class="btn-danger btn-small" onclick="removeFromCart('${item.libro_id_api}')">
-                                    <i class="fas fa-trash"></i> Eliminar
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                cartItemsContainer.innerHTML = html;
-                cartStat.innerText = totalItems;
-                cartSummary.style.display = 'block';
-                clearCartBtn.style.display = 'inline-block';
-                document.getElementById('cart-subtotal').innerText = `$${subtotal.toLocaleString()}`;
-                document.getElementById('cart-total').innerText = `$${subtotal.toLocaleString()}`;
-
-            } else {
-                cartItemsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-shopping-cart"></i>
-                        <h3>Tu carrito está vacío</h3>
-                        <p>Explora nuestros libros y añade algunos a tu carrito</p>
-                        <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
-                    </div>
-                `;
-                cartSummary.style.display = 'none';
-                clearCartBtn.style.display = 'none';
-                cartStat.innerText = 0;
-            }
+      const renderLocalCart = (localCart) => {
+        // Agrupar por id/libro_id_api
+        const grouped = {};
+        localCart.forEach(it => {
+          const key = String(it.libro_id_api || it.id || it.titulo)
+          if (!grouped[key]) grouped[key] = Object.assign({}, it, { cantidad: Number(it.quantity || it.cantidad || 1) })
+          else grouped[key].cantidad += Number(it.quantity || it.cantidad || 1)
         })
-        .catch(err => console.error('Error al cargar carrito:', err));
+
+        let html = ''
+        let subtotal = 0
+        let totalItems = 0
+
+        Object.values(grouped).forEach(item => {
+          const unit = parseNumberString(item.precio_unitario || item.precio || item.price || 0)
+          const qty = Number(item.cantidad || 0)
+          const itemTotal = unit * qty
+          subtotal += itemTotal
+          totalItems += qty
+
+          html += `
+            <div class="item-card">
+              <div class="item-header">
+                <img src="${item.imagen || item.image || item.imageUrl || ''}" alt="${item.titulo || item.title || ''}" class="item-image">
+                <div class="item-info">
+                  <h3 class="item-title">${item.titulo || item.title || ''}</h3>
+                  <p class="item-author">por Autor Desconocido</p>
+                  <p class="item-price">$${unit.toLocaleString()}</p>
+                </div>
+              </div>
+              <div class="quantity-controls">
+                <button class="quantity-btn" onclick="updateQuantity('${item.libro_id_api || item.id || item.title}', -1)">-</button>
+                <span class="quantity">${qty}</span>
+                <button class="quantity-btn" onclick="updateQuantity('${item.libro_id_api || item.id || item.title}', 1)">+</button>
+              </div>
+              <div class="item-actions">
+                <div style="font-weight: bold; color: #667eea;">Total: $${itemTotal.toLocaleString()}</div>
+                <button class="btn-danger btn-small" onclick="removeFromCart('${item.libro_id_api || item.id || item.title}')">
+                  <i class="fas fa-trash"></i> Eliminar
+                </button>
+              </div>
+            </div>
+          `
+        })
+
+        cartItemsContainer.innerHTML = html
+        cartStat.innerText = totalItems
+        cartSummary.style.display = totalItems > 0 ? 'block' : 'none'
+        clearCartBtn.style.display = totalItems > 0 ? 'inline-block' : 'none'
+        try { document.getElementById('cart-subtotal').innerText = `$${subtotal.toLocaleString()}` } catch (e) { /* ignore */ }
+        try { document.getElementById('cart-total').innerText = `$${subtotal.toLocaleString()}` } catch (e) { /* ignore */ }
+      }
+
+      // Merge: combinar carrito del servidor (si existe) con carrito local para evitar
+      // que items guardados solo en localStorage queden invisibles en la UI.
+      try {
+        const serverItems = (data && data.success && Array.isArray(data.items)) ? data.items : []
+        const localItems = getCart() || []
+
+        // Mapear por clave única (libro_id_api o id)
+        const map = new Map()
+
+        const pushToMap = (it, source) => {
+          const key = String(it.libro_id_api || it.id || it.titulo || '')
+          if (!map.has(key)) {
+            // Normalizar campos mínimos
+            map.set(key, Object.assign({}, it, {
+              cantidad: Number(it.cantidad || it.quantity || 0),
+              precio_unitario: parseNumberString(it.precio_unitario || it.precio || it.price || 0)
+            }))
+          } else {
+            const existing = map.get(key)
+            existing.cantidad = Number(existing.cantidad || 0) + Number(it.cantidad || it.quantity || 0)
+            // preferir datos del servidor para imagen/titulo/precio cuando vengan from server
+            if (source === 'server') {
+              existing.titulo = it.titulo || existing.titulo
+              existing.imagen = it.imagen || existing.imagen
+              existing.precio_unitario = parseNumberString(it.precio_unitario || existing.precio_unitario || 0)
+            }
+            map.set(key, existing)
+          }
+        }
+
+        // Primero añadir server items (prioritarios)
+        serverItems.forEach(it => pushToMap(it, 'server'))
+        // Luego añadir local items (sin sobrescribir server fields)
+        localItems.forEach(it => pushToMap(it, 'local'))
+
+        // Renderizar agrupados
+        let html = ''
+        let subtotal = 0
+        let totalItems = 0
+
+        Array.from(map.values()).forEach(item => {
+          const unit = parseNumberString(item.precio_unitario || item.precio || item.price || 0)
+          const qty = Number(item.cantidad || 0)
+          const itemTotal = unit * qty
+          subtotal += itemTotal
+          totalItems += qty
+
+          const idKey = item.libro_id_api || item.id || item.titulo || ''
+
+          html += `
+            <div class="item-card">
+              <div class="item-header">
+                <img src="${item.imagen || item.image || item.imageUrl || ''}" alt="${item.titulo || item.title || ''}" class="item-image">
+                <div class="item-info">
+                  <h3 class="item-title">${item.titulo || item.title || ''}</h3>
+                  <p class="item-author">por Autor Desconocido</p>
+                  <p class="item-price">$${unit.toLocaleString()}</p>
+                </div>
+              </div>
+              <div class="quantity-controls">
+                <button class="quantity-btn" onclick="updateQuantity('${idKey}', -1)">-</button>
+                <span class="quantity">${qty}</span>
+                <button class="quantity-btn" onclick="updateQuantity('${idKey}', 1)">+</button>
+              </div>
+              <div class="item-actions">
+                <div style="font-weight: bold; color: #667eea;">Total: $${itemTotal.toLocaleString()}</div>
+                <button class="btn-danger btn-small" onclick="removeFromCart('${idKey}')">
+                  <i class="fas fa-trash"></i> Eliminar
+                </button>
+              </div>
+            </div>
+          `
+        })
+
+        cartItemsContainer.innerHTML = html || `
+          <div class="empty-state">
+            <i class="fas fa-shopping-cart"></i>
+            <h3>Tu carrito está vacío</h3>
+            <p>Explora nuestros libros y añade algunos a tu carrito</p>
+            <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
+          </div>
+        `
+
+        cartStat.innerText = totalItems
+        cartSummary.style.display = totalItems > 0 ? 'block' : 'none'
+        clearCartBtn.style.display = totalItems > 0 ? 'inline-block' : 'none'
+        try { document.getElementById('cart-subtotal').innerText = `$${subtotal.toLocaleString()}` } catch (e) { /* ignore */ }
+        try { document.getElementById('cart-total').innerText = `$${subtotal.toLocaleString()}` } catch (e) { /* ignore */ }
+
+      } catch (e) {
+        console.warn('Error merging carts in loadCart:', e)
+        // fallback: intentar mostrar local
+        try {
+          const localCart = getCart() || []
+          if (localCart.length > 0) {
+            renderLocalCart(localCart)
+            return
+          }
+        } catch (ee) { /* ignore */ }
+
+        cartItemsContainer.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-shopping-cart"></i>
+            <h3>Tu carrito está vacío</h3>
+            <p>Explora nuestros libros y añade algunos a tu carrito</p>
+            <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
+          </div>
+        `;
+        cartSummary.style.display = 'none';
+        clearCartBtn.style.display = 'none';
+        cartStat.innerText = 0;
+      }
+    })
+    .catch(err => {
+      console.error('Error al cargar carrito:', err);
+      // En caso de error de red, intentar mostrar el carrito local
+      try {
+        const localCart = getCart() || []
+        if (localCart.length > 0) {
+          const cartItemsContainer = document.getElementById('cart-items');
+          const cartSummary = document.getElementById('cart-summary');
+          const clearCartBtn = document.getElementById('clear-cart-btn');
+          const cartStat = document.getElementById('cart-stat');
+          // Reuse render logic
+          const grouped = {};
+          localCart.forEach(it => {
+            const key = String(it.libro_id_api || it.id || it.titulo)
+            if (!grouped[key]) grouped[key] = Object.assign({}, it, { cantidad: Number(it.quantity || it.cantidad || 1) })
+            else grouped[key].cantidad += Number(it.quantity || it.cantidad || 1)
+          })
+
+          let html = ''
+          let subtotal = 0
+          let totalItems = 0
+          Object.values(grouped).forEach(item => {
+            const unit = parseNumberString(item.precio_unitario || item.precio || item.price || 0)
+            const qty = Number(item.cantidad || 0)
+            const itemTotal = unit * qty
+            subtotal += itemTotal
+            totalItems += qty
+            html += `
+              <div class="item-card">
+                <div class="item-header">
+                  <img src="${item.imagen || item.image || item.imageUrl || ''}" alt="${item.titulo || item.title || ''}" class="item-image">
+                  <div class="item-info">
+                    <h3 class="item-title">${item.titulo || item.title || ''}</h3>
+                    <p class="item-author">por Autor Desconocido</p>
+                    <p class="item-price">$${unit.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div class="quantity-controls">
+                  <button class="quantity-btn" onclick="updateQuantity('${item.libro_id_api || item.id || item.title}', -1)">-</button>
+                  <span class="quantity">${qty}</span>
+                  <button class="quantity-btn" onclick="updateQuantity('${item.libro_id_api || item.id || item.title}', 1)">+</button>
+                </div>
+                <div class="item-actions">
+                  <div style="font-weight: bold; color: #667eea;">Total: $${itemTotal.toLocaleString()}</div>
+                  <button class="btn-danger btn-small" onclick="removeFromCart('${item.libro_id_api || item.id || item.title}')">
+                    <i class="fas fa-trash"></i> Eliminar
+                  </button>
+                </div>
+              </div>
+            `
+          })
+
+          cartItemsContainer.innerHTML = html
+          cartStat.innerText = totalItems
+          cartSummary.style.display = totalItems > 0 ? 'block' : 'none'
+          clearCartBtn.style.display = totalItems > 0 ? 'inline-block' : 'none'
+          try { document.getElementById('cart-subtotal').innerText = `$${subtotal.toLocaleString()}` } catch (e) { /* ignore */ }
+          try { document.getElementById('cart-total').innerText = `$${subtotal.toLocaleString()}` } catch (e) { /* ignore */ }
+          return
+        }
+      } catch (e) { /* ignore */ }
+    });
 
       
 
@@ -235,21 +393,53 @@ window.addEventListener('DOMContentLoaded', loadCart);
 
  function removeFromCart(libro_id_api) {
   confirmWithToast('¿Seguro que quieres eliminar este libro del carrito?', () => {
-    fetch(`http://localhost:3000/carrito/${libro_id_api}`, {
+    // Intentar eliminar en servidor; si el servidor responde que no existe, hacer fallback local
+    fetch(`http://localhost:3000/carrito/${encodeURIComponent(libro_id_api)}`, {
       method: 'DELETE',
       credentials: 'include',
     })
-    .then(res => res.json())
+    .then(res => res.json().catch(() => ({ success: false })))
     .then(data => {
-      if (data.success) {
+      if (data && data.success) {
         try { showNotification('Libro eliminado del carrito', 'success') } catch (e) { console.log('Libro eliminado del carrito') }
         if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
-      } else {
-        try { showNotification('Error al eliminar el libro del carrito', 'warning') } catch (e) { console.error('Error al eliminar el libro del carrito') }
-        console.error(data.message);
+        return
       }
+
+      // Si servidor no encontró el libro o hubo error, intentar eliminar del carrito local
+      try {
+        const raw = localStorage.getItem('bookCart')
+        let cart = raw ? JSON.parse(raw) : []
+        const idx = cart.findIndex(item => String(item.id) === String(libro_id_api) || String(item.libro_id_api) === String(libro_id_api) || String(item.titulo) === String(libro_id_api))
+        if (idx !== -1) {
+          const removed = cart.splice(idx, 1)[0]
+          localStorage.setItem('bookCart', JSON.stringify(cart))
+          try { showNotification(`"${removed?.titulo || removed?.title || removed?.id}" eliminado del carrito (local)`, 'success') } catch (e) { /* ignore */ }
+          if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
+          return
+        }
+      } catch (e) {
+        console.warn('Fallback local removeFromCart failed', e)
+      }
+
+      // Si no se encontró en servidor ni en local, informar al usuario
+      try { showNotification(data && data.message ? data.message : 'Libro no encontrado en el carrito', 'warning') } catch (e) { console.error(data && data.message ? data.message : 'Libro no encontrado en el carrito') }
     })
-    .catch(err => console.error('Error en fetch removeFromCart:', err));
+    .catch(err => {
+      console.warn('Error en fetch removeFromCart, intentando fallback local:', err)
+      try {
+        const raw = localStorage.getItem('bookCart')
+        let cart = raw ? JSON.parse(raw) : []
+        const idx = cart.findIndex(item => String(item.id) === String(libro_id_api) || String(item.libro_id_api) === String(libro_id_api) || String(item.titulo) === String(libro_id_api))
+        if (idx !== -1) {
+          const removed = cart.splice(idx, 1)[0]
+          localStorage.setItem('bookCart', JSON.stringify(cart))
+          try { showNotification(`"${removed?.titulo || removed?.title || removed?.id}" eliminado del carrito (local)`, 'success') } catch (e) { /* ignore */ }
+          if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
+          return
+        }
+      } catch (e) { console.error('Fallback removeFromCart final failure', e) }
+    });
   }, () => {
     try { showNotification('Eliminación cancelada', 'info') } catch (e) { /* ignore */ }
   })
@@ -261,6 +451,8 @@ window.addEventListener('DOMContentLoaded', loadCart);
 document.addEventListener("DOMContentLoaded", () => {
   loadUserProfile()
   updateAllCounts()
+  // Intentar sincronizar items locales pendientes al servidor antes de cargar el carrito
+  try { syncLocalCartToServer().catch(() => {}) } catch (e) { /* ignore */ }
   loadCart()
   renderFavorites()
   renderOrders()
@@ -700,11 +892,112 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+// Mezcla items del servidor y del localStorage, sumando cantidades y prefiriendo
+// campos del servidor cuando estén presentes.
+function mergeServerAndLocal(serverItems) {
+  const local = getCart() || [];
+  const map = new Map();
+
+  const push = (it, source) => {
+    const key = String(it.libro_id_api || it.id || it.titulo || '');
+    if (!map.has(key)) {
+      map.set(key, {
+        libro_id_api: it.libro_id_api || it.id || it.titulo || '',
+        titulo: it.titulo || it.title || '',
+        imagen: it.imagen || it.image || it.imageUrl || '',
+        precio_unitario: parseNumberString(it.precio_unitario || it.precio || it.price || 0),
+        cantidad: Number(it.cantidad || it.quantity || 0)
+      });
+    } else {
+      const existing = map.get(key);
+      existing.cantidad = Number(existing.cantidad || 0) + Number(it.cantidad || it.quantity || 0);
+      if (source === 'server') {
+        if (it.titulo) existing.titulo = it.titulo;
+        if (it.imagen) existing.imagen = it.imagen;
+        existing.precio_unitario = parseNumberString(it.precio_unitario || existing.precio_unitario || 0);
+      }
+      map.set(key, existing);
+    }
+  };
+
+  (Array.isArray(serverItems) ? serverItems : []).forEach(it => push(it, 'server'));
+  local.forEach(it => push(it, 'local'));
+
+  return Array.from(map.values());
+}
+
+
+// Parsear cadenas numéricas en formatos localizados (ej: "23.000", "23,000.50", "23,000", "23.50")
+function parseNumberString(input) {
+  if (input == null) return 0;
+  let s = String(input).trim();
+  if (!s) return 0;
+  // eliminar símbolos de moneda y espacios
+  s = s.replace(/[^0-9,.-]/g, '');
+  const hasDot = s.indexOf('.') !== -1;
+  const hasComma = s.indexOf(',') !== -1;
+
+  if (hasDot && hasComma) {
+    // el separador decimal es el último que aparece
+    if (s.lastIndexOf('.') > s.lastIndexOf(',')) {
+      // punto como decimal, eliminar comas de miles
+      s = s.replace(/,/g, '');
+      return parseFloat(s) || 0;
+    } else {
+      // coma como decimal, eliminar puntos de miles
+      s = s.replace(/\./g, '').replace(',', '.');
+      return parseFloat(s) || 0;
+    }
+  }
+
+  if (hasComma) {
+    const parts = s.split(',');
+    // si la parte después de la coma tiene 3 dígitos, probablemente es separador de miles
+    if (parts[1] && parts[1].length === 3) {
+      s = s.replace(/,/g, '');
+      return parseFloat(s) || 0;
+    }
+    // sino, asumir coma decimal
+    s = s.replace(',', '.');
+    return parseFloat(s) || 0;
+  }
+
+  if (hasDot) {
+    const parts = s.split('.');
+    if (parts[1] && parts[1].length === 3) {
+      // punto como separador de miles
+      s = s.replace(/\./g, '');
+      return parseFloat(s) || 0;
+    }
+    return parseFloat(s) || 0;
+  }
+
+  return parseFloat(s) || 0;
+}
+
+
 function proceedToCheckout() {
   fetch('http://localhost:3000/carrito', { credentials: 'include' })
-    .then(res => res.json())
+    .then(res => res.json().catch(() => ({ success: false, items: [] })))
     .then(data => {
-      if (!data.success || !data.items || data.items.length === 0) {
+      let items = (data && data.success && Array.isArray(data.items)) ? data.items : []
+
+      // Merge: combinar items del servidor con los locales para incluir los
+      // que aún no se sincronizaron. Esto evita que el checkout muestre menos
+      // items que la UI del carrito (que ya hace merge en loadCart).
+      try {
+        items = mergeServerAndLocal(items)
+      } catch (e) {
+        // fallback: si ocurre algo, usar comportamiento anterior
+        if (!items || items.length === 0) {
+          try {
+            const local = getCart() || []
+            if (local && local.length > 0) items = local
+          } catch (err) { /* ignore */ }
+        }
+      }
+
+      if (!items || items.length === 0) {
         try { showNotification('Tu carrito está vacío o no se pudo cargar.', 'warning') } catch (e) { console.warn('Tu carrito está vacío o no se pudo cargar.') }
         return;
       }
@@ -716,12 +1009,14 @@ function proceedToCheckout() {
       let html = '';
       let total = 0;
 
-      data.items.forEach(item => {
-        const itemTotal = Number(item.precio_unitario) * item.cantidad;
+      items.forEach(item => {
+        const qty = Number(item.cantidad || item.quantity || 0)
+        const price = parseNumberString(item.precio_unitario || item.precio || item.price || item.price_unitario || 0)
+        const itemTotal = price * qty;
         total += itemTotal;
         html += `
           <div class="checkout-item">
-            <p><strong>${item.titulo}</strong> x${item.cantidad}</p>
+            <p><strong>${item.titulo || item.title}</strong> x${qty}</p>
             <p>$${itemTotal.toLocaleString()}</p>
           </div>
         `;
@@ -775,9 +1070,19 @@ function confirmOrder() {
   }
 
   fetch("http://localhost:3000/carrito", { credentials: "include" })
-    .then(res => res.json())
+    .then(res => res.json().catch(() => ({ success: false, items: [] })))
     .then(data => {
-        if (!data.success || data.items.length === 0) {
+        let items = (data && data.success && Array.isArray(data.items)) ? data.items : []
+        // Asegurar que incluimos también items locales no sincronizados
+        try {
+          items = mergeServerAndLocal(items)
+        } catch (e) {
+          if (!items || items.length === 0) {
+            try { items = getCart() || [] } catch (err) { items = [] }
+          }
+        }
+
+        if (!items || items.length === 0) {
         try { showNotification("Tu carrito está vacío. Agrega libros antes de confirmar el pedido.", 'warning') } catch (e) { console.warn('Tu carrito está vacío. Agrega libros antes de confirmar el pedido.') }
         return;
       }
@@ -787,7 +1092,7 @@ function confirmOrder() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: data.items,
+          items: items,
           cliente: {
             nombre: name,
             correo: email,
@@ -968,25 +1273,20 @@ function loadOrders() {
 // ========= FAVORITES FUNCTIONALITY =====
 
 function saveBook(bookId) {
-  // Obtener los favoritos guardados (del localStorage)
-  let favorites = JSON.parse(localStorage.getItem("favorites")) || [];
-
-  // Verificar si el libro ya está guardado
-  if (favorites.includes(bookId)) {
-    try { showToast("📚 Este libro ya está en tus favoritos", 'info') } catch (e) { alert("📚 Este libro ya está en tus favoritos") }
-    return;
+  // Compatibilidad: usar getFavorites/saveFavorites para mantener formato unificado
+  try {
+    let favorites = getFavorites() || []
+    if (favorites.some(f => String(f.id) === String(bookId))) {
+      try { showToast("📚 Este libro ya está en tus favoritos", 'info') } catch (e) { alert("📚 Este libro ya está en tus favoritos") }
+      return
+    }
+    favorites.push({ id: bookId })
+    saveFavorites(favorites)
+    try { showToast("❤️ Libro guardado en favoritos", 'success') } catch (e) { alert("❤️ Libro guardado en favoritos") }
+  } catch (e) {
+    console.warn('legacy saveBook fallback failed', e)
+    try { showToast("No se pudo guardar el favorito", 'error') } catch (e) { /* ignore */ }
   }
-
-  // Agregar el nuevo libro
-  favorites.push(bookId);
-
-  // Guardar en localStorage
-  localStorage.setItem("favorites", JSON.stringify(favorites));
-
-  // Actualizar el contador
-  updateFavoritesCount();
-
-  try { showToast("❤️ Libro guardado en favoritos", 'success') } catch (e) { alert("❤️ Libro guardado en favoritos") }
 }
 
 
@@ -1020,9 +1320,9 @@ function renderFavorites() {
 
   favorites.forEach((book, index) => {
     const price =
-      typeof book.price === "number"
-        ? book.price
-        : Number.parseFloat(book.price?.replace(/[^0-9.-]+/g, "")) || 0;
+        typeof book.price === "number"
+          ? book.price
+          : parseNumberString(book.price);
 
     html += `
       <div class="item-card">
@@ -1058,7 +1358,7 @@ function renderFavorites() {
 
 
 function updateFavoritesCount() {
-  const favorites = JSON.parse(localStorage.getItem("favorites")) || [];
+  const favorites = getFavorites() || [];
   const favoritesStat = document.getElementById("favorites-stat");
   if (favoritesStat) {
     favoritesStat.textContent = favorites.length;
@@ -1133,56 +1433,119 @@ function clearCart() {
 
 // ===== FAVORITES FUNCTIONALITY =====
 function getFavorites() {
-  const favorites = localStorage.getItem("bookFavorites")
-  return favorites ? JSON.parse(favorites) : []
+  const bookFavRaw = localStorage.getItem("bookFavorites")
+  const favRaw = localStorage.getItem("favorites")
+  const out = []
+  try {
+    if (bookFavRaw) {
+      const parsed = JSON.parse(bookFavRaw)
+      if (Array.isArray(parsed)) {
+        parsed.forEach(item => {
+          if (typeof item === 'string') out.push({ id: item })
+          else if (item && item.id) out.push(item)
+        })
+      }
+    }
+  } catch (e) { console.warn('getFavorites parse bookFavorites failed', e) }
+
+  try {
+    if (favRaw) {
+      const parsed2 = JSON.parse(favRaw)
+      if (Array.isArray(parsed2)) {
+        parsed2.forEach(item => {
+          if (typeof item === 'string') {
+            if (!out.some(x => String(x.id) === String(item))) out.push({ id: item })
+          } else if (item && item.id) {
+            if (!out.some(x => String(x.id) === String(item.id))) out.push(item)
+          }
+        })
+      }
+    }
+  } catch (e) { console.warn('getFavorites parse favorites failed', e) }
+
+  return out
 }
 
 function saveFavorites(favorites) {
-  localStorage.setItem("bookFavorites", JSON.stringify(favorites))
+  try {
+    localStorage.setItem("bookFavorites", JSON.stringify(favorites))
+    // also keep legacy key in sync to avoid mismatches in older code
+    localStorage.setItem("favorites", JSON.stringify(favorites.map(f => f.id || f)))
+  } catch (e) { console.warn('saveFavorites failed to write localStorage', e) }
   updateAllCounts()
   renderFavorites()
 }
 
 
 
-function addToCartFromFavorites(bookId, title, authors, price, imageUrl) {
-  // Intentar primero agregar al carrito del servidor (si el usuario tiene sesión)
-  const parsedPrice = Number.parseFloat(String(price).replace(/[^0-9.-]+/g, "")) || 0
+async function addToCartFromFavorites(bookId, title, authors, price, imageUrl) {
+  const parsedPrice = parseNumberString(price)
 
-  fetch('http://localhost:3000/carrito/agregar', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      libro_id_api: bookId,
-      titulo: title,
-      cantidad: 1,
-      precio_unitario: parsedPrice,
-      imagen: imageUrl
+  // Comprobar primero si ya está en el carrito en el servidor
+  try {
+    console.debug('[addToCartFromFavorites] payload:', { libro_id_api: bookId, titulo: title, precio_unitario: parsedPrice })
+    const checkRes = await fetch('http://localhost:3000/carrito', { credentials: 'include' })
+    const checkData = await checkRes.json().catch(() => ({ success: false }))
+    console.debug('[addToCartFromFavorites] server check response:', checkData)
+    if (checkData && checkData.success && Array.isArray(checkData.items)) {
+      const exists = checkData.items.some(it => String(it.libro_id_api || it.id) === String(bookId))
+      if (exists) {
+        try { showNotification(`"${title}" ya está en el carrito`, 'error') } catch (e) { /* ignore */ }
+        return
+      }
+    }
+  } catch (e) {
+    // ignore and fallback to local check below
+  }
+
+  // Comprobar carrito local como fallback
+  try {
+    const raw = localStorage.getItem('bookCart')
+    const cartLocal = raw ? JSON.parse(raw) : []
+    console.debug('[addToCartFromFavorites] local cart before add check:', cartLocal)
+    const existsLocal = cartLocal.some(it => String(it.id) === String(bookId) || String(it.libro_id_api) === String(bookId))
+    if (existsLocal) {
+      try { showNotification(`"${title}" ya está en el carrito`, 'error') } catch (e) { /* ignore */ }
+      return
+    }
+  } catch (e) {
+    // ignore parse errors
+  }
+
+  // Intentar agregar en el servidor
+  try {
+    const resp = await fetch('http://localhost:3000/carrito/agregar', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        libro_id_api: bookId,
+        titulo: title,
+        cantidad: 1,
+        precio_unitario: parsedPrice,
+        imagen: imageUrl
+      })
     })
-  })
-  .then(res => res.json())
-  .then(data => {
+    const data = await resp.json().catch(() => ({ success: false }))
     if (data && data.success) {
       showNotification(`"${title}" añadido al carrito`, 'success')
-      // refrescar la vista del carrito (usa loadCart que renderiza desde servidor)
-      if (typeof loadCart === 'function') {
-        try { loadCart() } catch (e) { /* ignore */ }
-      }
+      if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
       try { updateAllCounts() } catch (e) { /* ignore */ }
       return
     }
-
-    // Si el servidor no respondió con éxito, fallback a localStorage
-    fallbackAddToLocal()
-  })
-  .catch(err => {
-    // En caso de error de red, usar fallback local
+  } catch (err) {
     console.warn('Error agregando al carrito en el servidor, usando localStorage:', err)
-    fallbackAddToLocal()
-  })
+  }
 
-  function fallbackAddToLocal() {
+  // Fallback local
+  try {
+    const cart = getCart()
+    const existingIndex = cart.findIndex((book) => String(book.id) === String(bookId) || String(book.libro_id_api) === String(bookId))
+    if (existingIndex !== -1) {
+      try { showNotification('Este libro ya está en el carrito', 'error') } catch (e) { /* ignore */ }
+      return
+    }
+
     const newBook = {
       id: bookId,
       title,
@@ -1192,51 +1555,26 @@ function addToCartFromFavorites(bookId, title, authors, price, imageUrl) {
       quantity: 1,
     }
 
-    const cart = getCart()
-    const existingIndex = cart.findIndex((book) => book.id === bookId)
-
-    if (existingIndex !== -1) {
-      cart[existingIndex].quantity += 1
-      showNotification(`"${title}" cantidad actualizada en el carrito`, "success")
-    } else {
-      cart.push(newBook)
-      showNotification(`"${title}" añadido al carrito`, "success")
-    }
-
+    cart.push(newBook)
     saveCart(cart)
+    showNotification(`"${title}" añadido al carrito`, 'success')
+    try { updateAllCounts() } catch (e) { /* ignore */ }
+  } catch (e) {
+    console.error('Error al agregar favorito al carrito (fallback):', e)
+    try { showNotification('No se pudo agregar el libro al carrito', 'warning') } catch (e) { /* ignore */ }
   }
 }
 
+// Quitar favorito por índice
 function removeFromFavorites(index) {
-  const favorites = getFavorites()
-  const removedBook = favorites[index]
-  favorites.splice(index, 1)
-  saveFavorites(favorites)
-  showNotification(`"${removedBook.title}" eliminado de favoritos`, "info")
-}
-
-function clearFavorites() {
-  // Eliminamos todos los favoritos sin confirmación (petición del usuario)
-  try { localStorage.removeItem('bookFavorites') } catch (e) { /* ignore */ }
-  try { updateAllCounts() } catch (e) { /* ignore */ }
-  try { renderFavorites() } catch (e) { /* ignore */ }
-  try { showNotification('Favoritos limpiados', 'info') } catch (e) { console.log('Favoritos limpiados') }
-}
-
-// ===== ORDERS FUNCTIONALITY =====
-function getOrders() {
-  const orders = localStorage.getItem("bookOrders")
-  return orders ? JSON.parse(orders) : []
-}
-
-// Obtener carrito guardado en localStorage (fallback cuando no hay sesión)
-function getCart() {
-  const cart = localStorage.getItem('bookCart') || localStorage.getItem('bookCart')
   try {
-    return cart ? JSON.parse(cart) : []
+    const favorites = getFavorites()
+    const removedBook = favorites[index]
+    favorites.splice(index, 1)
+    saveFavorites(favorites)
+    showNotification(`"${removedBook?.title || removedBook?.titulo || ''}" eliminado de favoritos`, "info")
   } catch (e) {
-    console.warn('getCart parse error', e)
-    return []
+    console.warn('removeFromFavorites failed', e)
   }
 }
 
@@ -1258,12 +1596,128 @@ function saveCart(cart) {
   }
 }
 
+// Sincronizar items locales pendientes al servidor (intenta subir solo los que no existan en servidor)
+async function syncLocalCartToServer() {
+  try {
+    const local = getCart() || []
+    if (!local || local.length === 0) return
+
+    // Obtener items del servidor para evitar duplicados
+    let serverItems = []
+    try {
+      const res = await fetch('http://localhost:3000/carrito', { credentials: 'include' })
+      const data = await res.json().catch(() => ({ success: false }))
+      if (data && data.success && Array.isArray(data.items)) serverItems = data.items
+      else return // si no hay sesión/autorización, no intentamos sincronizar
+    } catch (e) {
+      // No podemos comunicarnos con el servidor ahora
+      return
+    }
+
+    const serverIds = new Set(serverItems.map(it => String(it.libro_id_api || it.id || it.titulo)))
+
+    // Filtrar los que no están en servidor
+    const toSync = local.filter(it => !serverIds.has(String(it.libro_id_api || it.id || it.titulo)))
+    if (toSync.length === 0) return
+
+    let cart = local.slice()
+
+    for (const item of toSync) {
+      try {
+        const payload = {
+          libro_id_api: item.libro_id_api || item.id || item.titulo || '',
+          titulo: item.titulo || item.title || '',
+          cantidad: Number(item.cantidad || item.quantity || 1),
+          precio_unitario: parseNumberString(item.precio_unitario || item.precio || item.price || 0),
+          imagen: item.imagen || item.image || item.imageUrl || ''
+        }
+
+        const resp = await fetch('http://localhost:3000/carrito/agregar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        })
+
+        const data = await resp.json().catch(() => ({ success: false }))
+        if (data && data.success) {
+          // remover item sincronizado del local cart
+          const idx = cart.findIndex(it => String(it.libro_id_api || it.id || it.titulo) === String(payload.libro_id_api))
+          if (idx !== -1) cart.splice(idx, 1)
+        } else {
+          // si el servidor responde que ya existe, también eliminar local para evitar duplicados
+          if (data && data.message && /ya está/i.test(String(data.message))) {
+            const idx = cart.findIndex(it => String(it.libro_id_api || it.id || it.titulo) === String(payload.libro_id_api))
+            if (idx !== -1) cart.splice(idx, 1)
+          }
+        }
+      } catch (e) {
+        console.warn('syncLocalCartToServer item failed', e)
+        // dejar el item en local y continuar con los demás
+      }
+    }
+
+    // Guardar cart residual local (los que no pudieron sincronizar)
+    try { localStorage.setItem('bookCart', JSON.stringify(cart || [])) } catch (e) { console.warn('syncLocalCartToServer save failed', e) }
+    // Actualizar vistas
+    try { updateAllCounts() } catch (e) { /* ignore */ }
+    try { if (typeof loadCart === 'function') loadCart() } catch (e) { /* ignore */ }
+  } catch (err) {
+    console.error('syncLocalCartToServer failed', err)
+  }
+}
+
+// Obtener carrito desde localStorage con fallback seguro
+function getCart() {
+  try {
+    const raw = localStorage.getItem('bookCart')
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!parsed) return []
+    // Si es un objeto con `items`, devolver ese array
+    if (Array.isArray(parsed)) return parsed
+    if (parsed.items && Array.isArray(parsed.items)) return parsed.items
+    return []
+  } catch (e) {
+    console.warn('getCart parse failed', e)
+    return []
+  }
+}
+
 function saveOrder(order) {
   const orders = getOrders()
   orders.unshift(order) // Add to beginning of array
   localStorage.setItem("bookOrders", JSON.stringify(orders))
   updateAllCounts()
   renderOrders()
+}
+
+// Recuperar pedidos desde localStorage (compatibilidad con keys legacy)
+function getOrders() {
+  try {
+    const raw = localStorage.getItem('bookOrders') || localStorage.getItem('orders')
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) return parsed
+    // Si es un objeto con `pedidos` o `items`, intentar devolver ese array
+    if (parsed && Array.isArray(parsed.pedidos)) return parsed.pedidos
+    if (parsed && Array.isArray(parsed.items)) return parsed.items
+    return []
+  } catch (e) {
+    console.warn('getOrders parse failed', e)
+    return []
+  }
+}
+
+// Wrapper seguro para renderOrders, delega a loadOrders si existe
+function renderOrders() {
+  if (typeof loadOrders === 'function') {
+    try { loadOrders(); return; } catch (e) { console.warn('renderOrders -> loadOrders failed', e) }
+  }
+  // Si no hay loadOrders, intentar usar una función admin/global si existe
+  if (typeof window.renderOrders === 'function' && window.renderOrders !== renderOrders) {
+    try { window.renderOrders(getOrders()); return } catch (e) { console.warn('fallback renderOrders failed', e) }
+  }
 }
 
 
@@ -1313,18 +1767,33 @@ function updateAllCounts() {
 function showNotification(message, type = "success") {
   const notification = document.getElementById("notification")
   const notificationText = document.getElementById("notification-text")
+  if (!notification || !notificationText) return
 
-  // Remove existing classes
+  // Reset classes and inline styles
   notification.className = "notification"
+  notification.style.background = ''
+  notification.style.color = ''
 
-  // Add type class
+  // Add type class for CSS-based styling when available
   notification.classList.add(`notification-${type}`)
+
+  // If caller requests explicit error styling, ensure red background
+  if (type === 'error') {
+    notification.style.background = '#f44336'
+    notification.style.color = '#fff'
+  } else if (type === 'warning') {
+    notification.style.background = '#ff9800'
+    notification.style.color = '#fff'
+  } else if (type === 'info') {
+    notification.style.background = '#2196f3'
+    notification.style.color = '#fff'
+  }
 
   notificationText.textContent = message
   notification.classList.add("show")
 
   setTimeout(() => {
-    notification.classList.remove("show")
+    try { notification.classList.remove("show") } catch (e) { /* ignore */ }
   }, 3000)
 }
 
@@ -1376,4 +1845,77 @@ document.addEventListener("keydown", (e) => {
     }
   }
 })
+
+
+// ===== DEBUG HELPERS =====
+// Función útil para depurar diferencias entre carrito local, carrito servidor y favoritos.
+// Úsala desde la consola del navegador con `dumpCartAndFavorites()` o provoca desde UI.
+async function dumpCartAndFavorites() {
+  try {
+    console.group('dumpCartAndFavorites')
+    const localCartRaw = localStorage.getItem('bookCart')
+    const localFavoritesRaw = localStorage.getItem('bookFavorites') || localStorage.getItem('favorites')
+    let localCart = []
+    let localFavorites = []
+    try { localCart = localCartRaw ? JSON.parse(localCartRaw) : [] } catch (e) { console.warn('parse localCart failed', e) }
+    try { localFavorites = localFavoritesRaw ? JSON.parse(localFavoritesRaw) : [] } catch (e) { console.warn('parse localFavorites failed', e) }
+
+    let serverCart = { success: false, items: [] }
+    try {
+      const res = await fetch('http://localhost:3000/carrito', { credentials: 'include' })
+      serverCart = await res.json().catch(() => ({ success: false, items: [] }))
+    } catch (e) {
+      console.warn('fetch server carrito failed', e)
+    }
+
+    console.log('Server cart:', serverCart)
+    console.log('Local cart:', localCart)
+    console.log('Favorites (bookFavorites/favorites):', localFavorites)
+    console.groupEnd()
+
+    // Mostrar overlay legible en la página para facilitar copia/pegado
+    const existing = document.getElementById('debug-modal')
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing)
+
+    const wrapper = document.createElement('div')
+    wrapper.id = 'debug-modal'
+    wrapper.style.position = 'fixed'
+    wrapper.style.left = '8px'
+    wrapper.style.top = '8px'
+    wrapper.style.right = '8px'
+    wrapper.style.bottom = '8px'
+    wrapper.style.background = 'rgba(0,0,0,0.8)'
+    wrapper.style.color = '#fff'
+    wrapper.style.zIndex = 99999
+    wrapper.style.padding = '18px'
+    wrapper.style.overflow = 'auto'
+    wrapper.style.fontFamily = 'monospace'
+
+    const closeBtn = document.createElement('button')
+    closeBtn.textContent = 'Cerrar'
+    closeBtn.style.position = 'absolute'
+    closeBtn.style.right = '18px'
+    closeBtn.style.top = '18px'
+    closeBtn.style.padding = '6px 10px'
+    closeBtn.style.cursor = 'pointer'
+    closeBtn.onclick = () => { try { wrapper.remove() } catch (e) { /* ignore */ } }
+
+    const pre = document.createElement('pre')
+    pre.style.whiteSpace = 'pre-wrap'
+    pre.style.color = '#fff'
+    pre.textContent = JSON.stringify({ serverCart, localCart, localFavorites }, null, 2)
+
+    wrapper.appendChild(closeBtn)
+    wrapper.appendChild(pre)
+    document.body.appendChild(wrapper)
+
+    return { serverCart, localCart, localFavorites }
+  } catch (err) {
+    console.error('dumpCartAndFavorites error', err)
+    return null
+  }
+}
+
+// Hacerla accesible globalmente para llamada rápida desde consola
+window.dumpCartAndFavorites = dumpCartAndFavorites
 

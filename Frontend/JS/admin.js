@@ -1,4 +1,73 @@
 console.log('admin.js loaded');
+// Lightweight toast implementation for admin pages
+function showToast(message, type = 'success', duration = 3500) {
+  try {
+    let container = document.getElementById('global-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'global-toast-container';
+      Object.assign(container.style, {
+        position: 'fixed',
+        right: '16px',
+        bottom: '16px',
+        zIndex: 10000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        alignItems: 'flex-end',
+        maxWidth: '360px',
+        pointerEvents: 'none'
+      });
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-item';
+    const color = (type === 'success') ? '#2ecc71' : (type === 'error') ? '#e74c3c' : (type === 'warning') ? '#f39c12' : '#3498db';
+    Object.assign(toast.style, {
+      background: '#fff',
+      color: '#111',
+      borderRadius: '8px',
+      boxShadow: '0 8px 22px rgba(0,0,0,0.12)',
+      padding: '10px 12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      minWidth: '220px',
+      borderLeft: `6px solid ${color}`,
+      opacity: '0',
+      transform: 'translateY(8px)',
+      transition: 'opacity 220ms ease, transform 220ms ease',
+      pointerEvents: 'auto',
+      fontSize: '14px'
+    });
+
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    // trigger animation
+    void toast.offsetWidth;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+
+    let removed = false;
+    const remove = () => {
+      if (removed) return;
+      removed = true;
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(8px)';
+      setTimeout(() => { if (toast && toast.parentNode) toast.parentNode.removeChild(toast); }, 260);
+    };
+
+    const timer = setTimeout(remove, duration);
+    toast.addEventListener('mouseenter', () => clearTimeout(timer));
+    toast.addEventListener('mouseleave', () => setTimeout(remove, 1500));
+
+    return { remove };
+  } catch (err) {
+    try { alert(message); } catch (e) { /* ignore */ }
+  }
+}
 // Asegurar que `confirmWithToast` exista en el ámbito global para evitar ReferenceError
 if (typeof confirmWithToast !== 'function') {
   window.confirmWithToast = function(message, onConfirm, onCancel) {
@@ -788,7 +857,7 @@ async function showOrderDetails(orderOrId) {
     const tb = table.querySelector('tbody');
     libros.forEach(item => {
       const tr = document.createElement('tr');
-      const precio = Number(item.precio_unitario || item.precio || item.price || 0);
+      const precio = parseNumberString(item.precio_unitario || item.precio || item.price || 0);
       const cantidad = Number(item.cantidad || item.quantity || 1);
       const subtotal = precio * cantidad;
 
@@ -1228,21 +1297,25 @@ async function openEditBookModal(id) {
 window.openEditBookModal = openEditBookModal;
 
 async function deleteFeaturedBook(id) {
-  if (!confirm('¿Eliminar este libro destacado?')) return;
-  try {
-    const res = await fetch(`/libros/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (res.ok && data && data.success) {
-      try { showToast('Libro eliminado', 'success') } catch (e) { alert('Libro eliminado') }
-      await loadFeaturedBooks();
-    } else {
-      console.error('Error eliminando libro:', data);
-      try { showToast('No se pudo eliminar el libro', 'error') } catch (e) { alert('No se pudo eliminar el libro') }
+  // use non-blocking confirm toast
+  confirmWithToast('¿Eliminar este libro destacado?', async () => {
+    try {
+      const res = await fetch(`/libros/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok && data && data.success) {
+        try { showToast('Libro eliminado', 'success') } catch (e) { alert('Libro eliminado') }
+        await loadFeaturedBooks();
+      } else {
+        console.error('Error eliminando libro:', data);
+        try { showToast('No se pudo eliminar el libro', 'error') } catch (e) { alert('No se pudo eliminar el libro') }
+      }
+    } catch (err) {
+      console.error('Error en deleteFeaturedBook:', err);
+      try { showToast('Error de red', 'error') } catch (e) { alert('Error de red') }
     }
-  } catch (err) {
-    console.error('Error en deleteFeaturedBook:', err);
-    try { showToast('Error de red', 'error') } catch (e) { alert('Error de red') }
-  }
+  }, () => {
+    try { showToast('Eliminación cancelada', 'info') } catch (e) { /* ignore */ }
+  });
 }
 
 // (Favoritos en admin eliminados: la funcionalidad de favoritos queda sólo en la vista cliente)

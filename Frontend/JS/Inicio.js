@@ -5,6 +5,46 @@ function goMiCuenta() {
    window.location.href = "mi-cuenta.html";
 }
 
+// Parsear cadenas numéricas en formatos localizados (ej: "23.000", "23,000.50", "23,000", "23.50")
+function parseNumberString(input) {
+    if (input == null) return 0;
+    let s = String(input).trim();
+    if (!s) return 0;
+    s = s.replace(/[^0-9,.-]/g, '');
+    const hasDot = s.indexOf('.') !== -1;
+    const hasComma = s.indexOf(',') !== -1;
+
+    if (hasDot && hasComma) {
+        if (s.lastIndexOf('.') > s.lastIndexOf(',')) {
+            s = s.replace(/,/g, '');
+            return parseFloat(s) || 0;
+        } else {
+            s = s.replace(/\./g, '').replace(',', '.');
+            return parseFloat(s) || 0;
+        }
+    }
+
+    if (hasComma) {
+        const parts = s.split(',');
+        if (parts[1] && parts[1].length === 3) {
+            s = s.replace(/,/g, '');
+            return parseFloat(s) || 0;
+        }
+        s = s.replace(',', '.');
+        return parseFloat(s) || 0;
+    }
+
+    if (hasDot) {
+        const parts = s.split('.');
+        if (parts[1] && parts[1].length === 3) {
+            s = s.replace(/\./g, '');
+            return parseFloat(s) || 0;
+        }
+        return parseFloat(s) || 0;
+    }
+
+    return parseFloat(s) || 0;
+}
 // Compatibilidad: algunas vistas llaman a `renderCart()` — delegar a funciones locales
 function renderCart() {
     if (typeof updateCartDisplay === 'function') {
@@ -329,8 +369,8 @@ function searchBooks() {
 
 
 // Añadir libro al carrito: intenta servidor con credenciales, cae a localStorage
-function addToCart(id, titulo, autores, precio, imagen) {
-    const parsedPrice = Number.parseFloat(String(precio).replace(/[^0-9.-]+/g, "")) || 0
+async function addToCart(id, titulo, autores, precio, imagen) {
+    const parsedPrice = parseNumberString(precio)
     const payload = {
         libro_id_api: id,
         titulo: titulo,
@@ -339,47 +379,78 @@ function addToCart(id, titulo, autores, precio, imagen) {
         imagen: imagen
     }
 
-    fetch('http://localhost:3000/carrito/agregar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
-    })
-    .then(res => res.json().catch(() => ({ success: false })))
-    .then(data => {
+    // Primero intentar comprobar si el libro ya está en el carrito (servidor)
+    try {
+        console.debug('[addToCart] payload:', payload)
+        const checkRes = await fetch('http://localhost:3000/carrito', { credentials: 'include' })
+        const checkData = await checkRes.json().catch(() => ({ success: false }))
+        console.debug('[addToCart] server check response:', checkData)
+        if (checkData && checkData.success && Array.isArray(checkData.items)) {
+            const exists = checkData.items.some(it => String(it.libro_id_api || it.id) === String(id))
+            if (exists) {
+                try { showToast(`"${titulo}" ya está en el carrito`, 'error') } catch (e) { /* ignore */ }
+                return
+            }
+        }
+    } catch (e) {
+        // Si falla la comprobación con servidor, caeremos a la comprobación local más abajo
+    }
+
+    // También comprobar carrito local como fallback antes de intentar agregar
+    try {
+        const raw = localStorage.getItem('bookCart')
+        let cart = raw ? JSON.parse(raw) : []
+        console.debug('[addToCart] local cart before add check:', cart)
+        const idx = cart.findIndex(it => String(it.id) === String(id) || String(it.libro_id_api) === String(id))
+        if (idx !== -1) {
+            try { showToast(`"${titulo}" ya está en el carrito`, 'error') } catch (e) { /* ignore */ }
+            return
+        }
+    } catch (e) {
+        console.warn('[addToCart] local parse error', e)
+        // ignore parse errors and continue to try server add
+    }
+
+    // Intentar añadir en el servidor
+    try {
+        const res = await fetch('http://localhost:3000/carrito/agregar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        })
+        const data = await res.json().catch(() => ({ success: false }))
+        console.debug('[addToCart] server add response:', data)
         if (data && data.success) {
             try { showToast(`"${titulo}" agregado al carrito`, 'success') } catch (e) { /* ignore */ }
             try { if (typeof updateAllCounts === 'function') updateAllCounts(); else if (typeof updateCartCount === 'function') updateCartCount() } catch (e) { /* ignore */ }
             try { if (typeof loadCart === 'function') loadCart(); else if (typeof renderCart === 'function') renderCart() } catch (e) { /* ignore */ }
             return
         }
+    } catch (err) {
+        console.warn('addToCart network error, will fallback to local', err)
+    }
 
-        // Fallback local si el servidor no acepta
+    // Si llegamos aquí, usar fallback local
+    try {
         const raw = localStorage.getItem('bookCart')
-        let cart = []
-        try { cart = raw ? JSON.parse(raw) : [] } catch (e) { cart = [] }
+        let cart = raw ? JSON.parse(raw) : []
         const idx = cart.findIndex(it => String(it.id) === String(id) || String(it.libro_id_api) === String(id))
         if (idx !== -1) {
-            cart[idx].quantity = (cart[idx].quantity || cart[idx].cantidad || 0) + 1
+            try { showToast('Este libro ya está en el carrito', 'error') } catch (e) { /* ignore */ }
         } else {
-            cart.push({ id, titulo, autores, precio: parsedPrice, imagen, quantity: 1 })
+            // Normalizar para usar `libro_id_api` en objetos locales
+            const localItem = { id, libro_id_api: id, titulo, autores, precio: parsedPrice, imagen, quantity: 1 }
+            cart.push(localItem)
+            localStorage.setItem('bookCart', JSON.stringify(cart))
+            console.debug('[addToCart] local cart after push:', cart)
+            try { showToast(`"${titulo}" agregado al carrito (local)`, 'success') } catch (e) { /* ignore */ }
+            try { if (typeof updateAllCounts === 'function') updateAllCounts() } catch (e) { /* ignore */ }
         }
-        localStorage.setItem('bookCart', JSON.stringify(cart))
-        try { showToast(`"${titulo}" agregado al carrito (local)`, 'success') } catch (e) { /* ignore */ }
-        try { if (typeof updateAllCounts === 'function') updateAllCounts() } catch (e) { /* ignore */ }
-    })
-    .catch(err => {
-        console.warn('addToCart network error, using local fallback', err)
-        const raw = localStorage.getItem('bookCart')
-        let cart = []
-        try { cart = raw ? JSON.parse(raw) : [] } catch (e) { cart = [] }
-        const idx = cart.findIndex(it => String(it.id) === String(id))
-        if (idx !== -1) cart[idx].quantity = (cart[idx].quantity || 0) + 1
-        else cart.push({ id, titulo, autores, precio: parsedPrice, imagen, quantity: 1 })
-        localStorage.setItem('bookCart', JSON.stringify(cart))
-        try { showToast(`"${titulo}" agregado al carrito (local)`, 'success') } catch (e) { /* ignore */ }
-        try { if (typeof updateAllCounts === 'function') updateAllCounts() } catch (e) { /* ignore */ }
-    })
+    } catch (e) {
+        console.error('Error al usar fallback local en addToCart:', e)
+        try { showToast('No se pudo agregar el libro al carrito', 'error') } catch (e) { /* ignore */ }
+    }
 }
 
 
