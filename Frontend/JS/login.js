@@ -62,6 +62,19 @@ form.addEventListener('submit', async (e) => {
     const data = await res.json().catch(() => ({ success: false, message: 'Respuesta inválida del servidor' }));
     console.log('Respuesta del backend:', data);
 
+    // detect inactive account markers in common response shapes
+    const inactiveDetected = !!(data && (
+      data.activo === false || data.active === false ||
+      (data.estado && String(data.estado).toLowerCase().includes('inactiv')) ||
+      (data.user && (data.user.activo === false || data.user.active === false))
+    ));
+
+    if (inactiveDetected) {
+      mensajeEl.textContent = 'Cuenta inactiva. Comunícate al número +57 300 123 4567 para activar tu cuenta.';
+      mensajeEl.className = 'error';
+      return;
+    }
+
     if (data && data.success) {
       mensajeEl.textContent = data.message || 'Inicio de sesión correcto';
       mensajeEl.className = 'success';

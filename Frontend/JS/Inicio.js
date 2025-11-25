@@ -418,12 +418,12 @@ function renderBooksList(books) {
             <img src="${book.image || '/abstract-book-cover.png'}" alt="${(book.title||'').replace(/"/g,'&quot;')}" class="book-image">
             <div class="book-content">
                 <h3 class="book-title">${(book.title||'')}</h3>
-                <p class="book-author">por ${book.author || 'Desconocido'}</p>
+                <p class="book-author">por ${book.author || book.autor || 'Desconocido'}</p>
                 <p class="book-price">$${Number(book.price||0).toLocaleString()}</p>
                 <div class="book-actions">
-                    <button class="btn btn-primary" onclick="openModal('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '${(book.description||'').replace(/'/g, "\\'").substring(0,200)}', '${book.image || ''}', '$${Number(book.price||0).toLocaleString()}')">Ver más</button>
-                    <button class="btn btn-secondary" onclick="addToCart('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '$${Number(book.price||0).toLocaleString()}', '${book.image || ''}')">Añadir</button>
-                    <button class="btn btn-save" onclick="saveBook('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '$${Number(book.price||0).toLocaleString()}', '${book.image || ''}')">Guardar</button>
+                    <button class="btn btn-primary" onclick="openModal('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${((book.author||book.autor)||'').replace(/'/g, "\\'")}', '${(book.description||'').replace(/'/g, "\\'").substring(0,200)}', '${book.image || ''}', '$${Number(book.price||0).toLocaleString()}')">Ver más</button>
+                    <button class="btn btn-secondary" onclick="addToCart('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${((book.author||book.autor)||'').replace(/'/g, "\\'")}', '$${Number(book.price||0).toLocaleString()}', '${book.image || ''}')">Añadir</button>
+                    <button class="btn btn-save" onclick="saveBook('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${((book.author||book.autor)||'').replace(/'/g, "\\'")}', '$${Number(book.price||0).toLocaleString()}', '${book.image || ''}')">Guardar</button>
                 </div>
             </div>
         </div>
@@ -441,6 +441,9 @@ function searchBooks() {
     console.log("Buscando libros...");
     const query = document.getElementById("search-input").value;
     const q = String(query || '').trim().toLowerCase();
+    // Determinar campo de búsqueda: 'all' | 'title' | 'author'
+    const fieldEl = document.getElementById('search-field');
+    const selectedField = fieldEl ? String(fieldEl.value || 'all') : 'all';
     // Leer filtros de precio (usar parseNumberString para soportar separadores de miles)
     const minPriceRaw = document.getElementById('min-price') ? document.getElementById('min-price').value : '';
     const maxPriceRaw = document.getElementById('max-price') ? document.getElementById('max-price').value : '';
@@ -484,6 +487,22 @@ function searchBooks() {
                     if (maxPrice != null && priceVal > maxPrice) return false;
                     return true;
                 });
+            }
+
+            // Si el usuario indicó buscar por autor o título, aplicar un filtrado adicional en cliente
+            if (q && selectedField && selectedField !== 'all') {
+                const nq = normalizeStr(q);
+                if (selectedField === 'author') {
+                    books = books.filter(book => {
+                        const a = normalizeStr(book.author || book.autor || '');
+                        return a.indexOf(nq) !== -1;
+                    });
+                } else if (selectedField === 'title') {
+                    books = books.filter(book => {
+                        const t = normalizeStr(book.title || '');
+                        return t.indexOf(nq) !== -1;
+                    });
+                }
             }
 
             // Usar el helper para renderizar la lista final
@@ -635,8 +654,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 searchBooks();
             }
         });
+        // Mostrar/ocultar botón de limpiar según contenido
+        const clearBtn = document.getElementById('search-clear');
+        if (clearBtn) {
+            const toggleClear = () => { clearBtn.style.display = (searchInput.value && searchInput.value.trim().length>0) ? 'inline-flex' : 'none'; };
+            searchInput.addEventListener('input', toggleClear);
+            toggleClear();
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearSearch();
+            });
+        }
     }
 });
+
+// Limpiar búsqueda y mostrar todos los libros (vista por defecto)
+async function clearSearch() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
+    // limpiar filtros de precio
+    const minEl = document.getElementById('min-price'); if (minEl) minEl.value = '';
+    const maxEl = document.getElementById('max-price'); if (maxEl) maxEl.value = '';
+    // limpiar selecciones de género si existe la función
+    try { if (typeof clearSelectedGenres === 'function') clearSelectedGenres(); } catch(e) { /* ignore */ }
+
+    // Traer todos los libros y renderizarlos
+    try {
+        const res = await fetch('/libros');
+        const data = await res.json();
+        const books = (data && data.success && Array.isArray(data.books)) ? data.books : [];
+        renderBooksList(books);
+        // ocultar botón de limpiar
+        const clearBtn = document.getElementById('search-clear'); if (clearBtn) clearBtn.style.display = 'none';
+    } catch (err) {
+        console.error('Error al cargar libros al limpiar búsqueda:', err);
+    }
+}
 
 
 // ===== FUNCIONES DE FAVORITOS =====

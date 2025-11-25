@@ -50,11 +50,14 @@
                     <i class="fas fa-book"></i>
                     <span>Libros </span>
                 </li>
-                <li class="nav-item" data-section="reports">
-                    <i class="fas fa-chart-bar"></i>
-                    <span>Reportes</span>
+                <li class="nav-item" data-section="inventory">
+                    <i class="fas fa-boxes"></i>
+                    <span>Inventario</span>
                 </li>
-               
+                <li class="nav-item" data-section="settings">
+                    <i class="fas fa-cogs"></i>
+                    <span>Configuración</span>
+                </li>
             </ul>
         </nav>
     </aside>
@@ -136,6 +139,115 @@
             </div>
         </section>
 
+        <section id="inventory" class="admin-section">
+                <div class="section-header">
+        <h2>Inventario</h2>
+        <div class="section-actions">
+           
+            <div class="form-group">
+            </div>
+        </div> 
+    </div> 
+
+    <!-- Agregando tabs para organizar la vista de inventario -->
+    <div class="inventory-tabs">
+        <button class="inventory-tab active" data-tab="stock">
+            <i class="fas fa-boxes"></i>
+            <span>Stock de Productos</span>
+        </button>
+        <button class="inventory-tab" data-tab="suppliers">
+            <i class="fas fa-truck"></i>
+            <span>Proveedores</span>
+        </button>
+        <button class="inventory-tab" data-tab="purchase-orders">
+            <i class="fas fa-file-invoice"></i>
+            <span>Órdenes de Compra</span>
+        </button>
+    </div>
+<!-- Tab de Stock de Productos -->
+    <div class="inventory-tab-content active" id="stock-tab">
+        <div class="inventory-stats" id="inventoryStats" style="margin-bottom:12px; display:flex; gap:12px; flex-wrap:wrap;">
+            <!-- Totales y tarjetas renderizadas dinámicamente -->
+        </div>
+
+        <div class="table-container">
+            <table class="admin-table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>Autor</th>
+                        <th>Género</th>
+                        <th>Precio Unitario</th>
+                        <th>Stock</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryReport">
+                    <!-- filas llenadas dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+            <!-- Tab de Proveedores (solo diseño UI) -->
+            <div class="inventory-tab-content" id="suppliers-tab">
+                <div class="suppliers-header">
+                    <h3>Gestión de Proveedores</h3>
+                    <button class="btn-primary" onclick="openAddSupplierModal()">
+                        <i class="fas fa-plus"></i>
+                        Agregar Proveedor
+                    </button>
+                </div>
+
+               
+
+                <div id="suppliersContainer" class="suppliers-list">
+                </div>
+            </div>
+
+            <div class="inventory-tab-content" id="purchase-orders-tab">
+                <div class="purchase-orders-header">
+                    <h3>Órdenes de Compra</h3>
+                    <button class="btn-primary" onclick="openNewPurchaseOrderModal()">
+                        <i class="fas fa-plus"></i>
+                        Nueva Orden
+                    </button>
+                </div>
+
+                <div class="purchase-filters">
+                    <input type="text" id="purchaseSupplierSearch" placeholder="Buscar por proveedor..." style="min-width:220px;" />
+                    <button class="btn-secondary" onclick="filterPurchaseOrders()">Filtrar</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID Orden</th>
+                                <th>Proveedor</th>
+                                <th>Fecha</th>
+                                <th>Productos</th>
+                                <th>Total</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="purchaseOrdersTable">
+                            <tr class="empty-state">
+                                <td colspan="6" style="text-align: center; padding: 3rem;">
+                                    <i class="fas fa-file-invoice" style="font-size: 3rem; color: #ddd; margin-bottom: 1rem; display: block;"></i>
+                                    <p style="color: #999; margin-bottom: 1rem;">No hay órdenes de compra registradas</p>
+                                    <button class="btn-primary" onclick="openNewPurchaseOrderModal()">Crear Primera Orden</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Alertas tab removed -->
+        </section>
+
         <section id="orders" class="admin-section">
             <div class="section-header">
                 <h2>Gestión de Pedidos</h2>
@@ -174,11 +286,12 @@
             <div class="section-header">
                 <h2>Gestión de Usuarios</h2>
                 <div class="section-actions">
-                    <input type="text" id="userSearch" placeholder="Buscar usuario...">
-                    <!-- <button class="btn-primary" onclick="exportUsers()">
-                        <i class="fas fa-download"></i>
-                        Exportar
-                    </button> -->
+                                        <input type="text" id="userSearch" placeholder="Buscar usuario...">
+                                        <label style="display:flex;align-items:center;gap:8px;margin-left:12px;font-size:0.95rem;">
+                                            <input type="checkbox" id="showInactiveUsers" />
+                                            <span style="font-size:0.9rem;color:#444;">Mostrar inactivos</span>
+                                        </label>
+                   
                 </div>
             </div>
             
@@ -192,7 +305,6 @@
                             <th>Fecha Registro</th>
                             <th>Pedidos</th>
                             <th>Estado</th>
-                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="usersTable">
@@ -205,10 +317,15 @@
             <div class="section-header">
                 <h2>Libros <span id="booksCount" style="font-size:0.9rem; color:#666; margin-left:8px;"></span></h2>
                 <div class="section-actions">
-                    <button class="btn-primary" onclick="openAddBookModal()">
-                        <i class="fas fa-plus"></i>
-                        Agregar Libro
-                    </button>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="text" id="admin-book-search" placeholder="Buscar título o autor..." style="min-width:220px;padding:6px 8px;border-radius:6px;border:1px solid #ddd;">
+                        <select id="admin-search-field" style="padding:6px 8px;border-radius:6px;border:1px solid #ddd;">
+                            <option value="all">Todos</option>
+                            <option value="title">Título</option>
+                            <option value="author">Autor</option>
+                        </select>
+                        <button class="btn-secondary" id="admin-search-clear">Limpiar</button>
+                    </div>
                 </div>
             </div>
             
@@ -217,42 +334,7 @@
             </div>
         </section>
 
-        <section id="reports" class="admin-section">
-            <div class="section-header">
-                <h2>Reportes y Análisis</h2>
-            </div>
-            
-            <div class="reports-grid">
-                <div class="report-card">
-                    <h3>Reporte de Ventas</h3>
-                    <div class="report-filters">
-                        <select id="salesPeriod">
-                            <option value="week">Esta semana</option>
-                            <option value="month">Este mes</option>
-                            <option value="year">Este año</option>
-                        </select>
-                        <button class="btn-secondary" onclick="generateSalesReport()">Generar</button>
-                    </div>
-                    <div class="report-content" id="salesReport">
-                         Contenido del reporte 
-                    </div>
-                </div>
-                
-                <div class="report-card">
-                    <h3>Libros Más Vendidos</h3>
-                    <div class="top-books" id="topBooks">
-                         Se llena dinámicamente 
-                    </div>
-                </div>
-                
-                <div class="report-card">
-                    <h3>Análisis de Usuarios</h3>
-                    <div class="user-analytics" id="userAnalytics">
-                         Se llena dinámicamente 
-                    </div>
-                </div>
-            </div>
-        </section>
+        <!-- Sección 'Reportes' eliminada según solicitud del administrador -->
 
         <section id="settings" class="admin-section">
             <div class="section-header">
@@ -267,77 +349,80 @@
                             <label>Nombre de la Tienda</label>
                             <input type="text" id="storeName" value="BookStore">
                         </div>
-                        <div class="form-group">
-                            <label>Email de Contacto</label>
-                            <input type="email" id="storeEmail" value="admin@bookstore.com">
-                        </div>
+                        
                         <div class="form-group">
                             <label>Teléfono</label>
                             <input type="tel" id="storePhone" value="+57 300 123 4567">
+                        </div>
+                         <div class="form-group">
+                            <label>Nuevo email </label>
+                            <input type="email" id="newEmail" placeholder="nuevo-email@ejemplo.com" />
+                        </div>
+                        <div class="form-group">
+                            <label>Confirmar nuevo email</label>
+                            <input type="email" id="confirmNewEmail" placeholder="Repite el nuevo email" />
                         </div>
                         <button type="submit" class="btn-primary">Guardar Cambios</button>
                     </form>
                 </div>
                 
                 <div class="settings-card">
-                    <h3>Configuración de Envío</h3>
-                    <form id="shippingSettings">
+                    <h3>Cambio de Credenciales</h3>
+                    <form id="credentialsForm">
+                        
                         <div class="form-group">
-                            <label>Costo de Envío</label>
-                            <input type="number" id="shippingCost" value="5000">
+                            <label>Contraseña actual</label>
+                            <input type="password" id="currentPassword" placeholder="Contraseña actual" required />
                         </div>
                         <div class="form-group">
-                            <label>Envío Gratis Desde</label>
-                            <input type="number" id="freeShippingFrom" value="50000">
+                            <label>Nueva contraseña</label>
+                            <input type="password" id="newPassword" placeholder="Nueva contraseña" />
                         </div>
+                       
                         <div class="form-group">
-                            <label>Tiempo de Entrega (días)</label>
-                            <input type="number" id="deliveryTime" value="3">
+                            <label>Confirmar nueva contraseña</label>
+                            <input type="password" id="confirmNewPassword" placeholder="Repite la nueva contraseña" />
                         </div>
-                        <button type="submit" class="btn-primary">Guardar Cambios</button>
+                       
+                        <button type="submit" class="btn-primary">Actualizar credenciales</button>
                     </form>
                 </div>
             </div>
         </section>
     </main>
 
+    <!-- Modal para agregar/editar libro (restaurado para edición desde stock) -->
     <div id="addBookModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
-                <h3>Agregar Libro </h3>
+                <h3 id="addBookModalTitle">Agregar / Editar Libro</h3>
                 <span class="close" onclick="closeAddBookModal()">&times;</span>
             </div>
             <form id="addBookForm">
-                <input type="hidden" id="bookId">
+                <input type="hidden" id="bookId" value="" />
                 <div class="form-group">
-                    <label>Título del Libro</label>
-                    <input type="text" id="bookTitle" required>
+                    <label>Título</label>
+                    <input type="text" id="bookTitle" required />
                 </div>
                 <div class="form-group">
                     <label>Autor</label>
-                    <input type="text" id="bookAuthor" required>
-                </div>
-                <div class="form-group">
-                    <label>Precio</label>
-                    <input type="text" id="bookPrice" required>
-                </div>
-                <!-- La cantidad e ISBN ya no son necesarios en el formulario de registro -->
-                <div class="form-group">
-                    <label>URL de la Imagen</label>
-                    <input type="url" id="bookImage">
+                    <input type="text" id="bookAuthor" />
                 </div>
                 <div class="form-group">
                     <label>Género</label>
-                    <select id="bookGenre" class="form-control">
-                        <option value="">Seleccione un género</option>
-                        <option value="Ciencia ficción">Ciencia ficción</option>
-                        <option value="Romance">Romance</option>
-                        <option value="Terror">Terror</option>
-                        <option value="Fantasia">Fantasía</option>
-                        <option value="Misterio">Misterio</option>
-                        <option value="Aventura">Aventura</option>
-                        <option value="Drama">Drama</option>
-                    </select>
+                    <input type="text" id="bookGenre" />
+                </div>
+                <div class="form-group">
+                    <label>Precio Unitario</label>
+                    <input type="text" id="bookPrice" placeholder="0.00" />
+                </div>
+                <div class="form-group">
+                    <label>Cantidad</label>
+                    <input type="number" id="bookStock" min="0" value="0" />
+                </div>
+                <div class="form-group">
+                    <label>URL Imagen</label>
+                    <input type="text" id="bookImage" placeholder="https://..." />
                 </div>
                 <div class="form-group">
                     <label>Descripción</label>
@@ -345,7 +430,7 @@
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="closeAddBookModal()">Cancelar</button>
-                    <button type="submit" class="btn-primary">Agregar Libro</button>
+                    <button type="submit" class="btn-primary">Guardar Libro</button>
                 </div>
             </form>
         </div>
@@ -364,16 +449,103 @@
         </div>
     </div>
 
-    <!-- Modal para resumen de ventas -->
-    <div id="salesSummaryModal" class="modal">
+    <!-- Modal de resumen de ventas eliminado junto con la sección de reportes -->
+
+    <!-- Modal para agregar proveedor (solo diseño UI) -->
+    <div id="addSupplierModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Resumen de Ventas</h3>
-                <span class="close" onclick="closeSalesSummaryModal()">&times;</span>
+                <h3>Agregar Proveedor</h3>
+                <span class="close" onclick="closeAddSupplierModal()">&times;</span>
             </div>
-            <div id="salesSummaryContent" style="padding:16px;">
-                <!-- rellenado dinámicamente -->
+            <form id="addSupplierForm">
+                <div class="form-group">
+                    <label>Nombre del Proveedor</label>
+                    <input type="text" id="supplierName" required>
+                </div>
+                <div class="form-group">
+                    <label>Empresa</label>
+                    <input type="text" id="supplierCompany" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="supplierEmail" required>
+                    <div class="input-error" id="supplierEmailError" aria-live="polite"></div>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" id="supplierPhone" required>
+                    <div class="input-error" id="supplierPhoneError" aria-live="polite"></div>
+                </div>
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <textarea id="supplierAddress" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Productos</label>
+                    <input type="text" id="supplierProducts" placeholder="Ej: Libros de ficción, Novelas...">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddSupplierModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar Proveedor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para nueva orden de compra (solo diseño UI) -->
+    <div id="newPurchaseOrderModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>Nueva Orden de Compra</h3>
+                <span class="close" onclick="closeNewPurchaseOrderModal()">&times;</span>
             </div>
+            <form id="newPurchaseOrderForm">
+                <div class="form-group">
+                    <label>Proveedor</label>
+                    <select id="purchaseSupplier" required>
+                        <option value="">Seleccione un proveedor</option>
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha de Orden</label>
+                    <input type="date" id="purchaseDate" required>
+                </div>
+               
+                
+                <h4 style="margin: 1.5rem 0 1rem; color: #333;">Productos</h4>
+                <div id="purchaseProductsList">
+                    <div class="purchase-product-item">
+                        <input type="text" class="purchase-product-name" placeholder="Nombre del libro / título" />
+                        <input type="text" class="purchase-author" placeholder="Autor" />
+                        <input type="text" class="purchase-genre" placeholder="Género" />
+                        <input type="number" class="purchase-quantity" placeholder="Cantidad" min="1" value="1" />
+                        <input type="number" class="purchase-unit-price" placeholder="Precio unitario" min="0" step="0.01" value="0" />
+                        <button type="button" class="btn-danger btn-sm" onclick="removePurchaseProduct(this)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <button type="button" class="btn-secondary" onclick="addPurchaseProduct()">
+                    <i class="fas fa-plus"></i>
+                    Agregar Producto
+                </button>
+
+                <div class="purchase-total" style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                    <h4 style="text-align: right; color: #333;">Total: $<span id="purchaseTotal">0.00</span></h4>
+                </div>
+
+                <div class="form-group">
+                    <label>Notas</label>
+                    <textarea id="purchaseNotes" rows="3" placeholder="Notas adicionales sobre la orden..."></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeNewPurchaseOrderModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Crear Orden</button>
+                </div>
+            </form>
         </div>
     </div>
 

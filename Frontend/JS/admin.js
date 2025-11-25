@@ -574,21 +574,53 @@ function initSidebar() {
   const items = document.querySelectorAll('.nav-item');
   const sections = document.querySelectorAll('.admin-section');
 
+  if (!items || items.length === 0) {
+    console.debug('initSidebar: no nav items found');
+    return;
+  }
+
   items.forEach(it => {
-    it.addEventListener('click', () => {
+    it.addEventListener('click', (e) => {
+      // debug: registrar el click y el objetivo
+      try {
+        console.debug('initSidebar click:', { section: it.dataset.section, target: e.target && (e.target.tagName + ':' + (e.target.className || e.target.id || '')) });
+      } catch (err) { /* ignore */ }
+
       // set active nav
       items.forEach(i => i.classList.remove('active'));
       it.classList.add('active');
 
       // show section
-      const sectionId = it.dataset.section;
+      const sectionId = (it.dataset && it.dataset.section) ? String(it.dataset.section).trim() : null;
       sections.forEach(s => s.classList.remove('active'));
+      if (!sectionId) {
+        console.warn('initSidebar: nav item has no data-section:', it);
+        return;
+      }
       const target = document.getElementById(sectionId);
-      if (target) target.classList.add('active');
+      if (target) {
+        target.classList.add('active');
+      } else {
+        console.warn('initSidebar: no section found for id', sectionId);
+      }
+
       // cargar datos específicos por sección
-      if (sectionId === 'orders') loadOrders();
-      if (sectionId === 'users') loadUsers();
-      if (sectionId === 'dashboard') loadRecentActivity();
+      if (sectionId === 'orders') try { loadOrders(); } catch (e) { console.warn('loadOrders failed', e); }
+      if (sectionId === 'users') try { loadUsers(); } catch (e) { console.warn('loadUsers failed', e); }
+      if (sectionId === 'dashboard') try { loadRecentActivity(); } catch (e) { console.warn('loadRecentActivity failed', e); }
+      if (sectionId === 'inventory') {
+        try {
+          // Ensure inventory tabs exist and load the currently active tab (or default to stock)
+          try { initInventoryTabs(); } catch (e) { /* already initialized or not needed */ }
+          const activeTab = document.querySelector('.inventory-tab.active') || document.querySelector('.inventory-tab[data-tab="stock"]');
+          const name = activeTab && activeTab.dataset ? activeTab.dataset.tab : 'stock';
+          if (name === 'stock') { try { loadInventoryReports(); } catch (e) { console.warn('loadInventoryReports failed', e); } }
+          else if (name === 'suppliers') { try { loadSuppliers(); } catch (e) { console.warn('loadSuppliers failed', e); } }
+          else if (name === 'purchase-orders') { try { loadPurchaseOrders(); } catch (e) { console.warn('loadPurchaseOrders failed', e); } }
+        } catch (e) {
+          console.warn('Error initializing inventory view', e);
+        }
+      }
     });
   });
 }
@@ -779,6 +811,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+  // Toggle show inactive users control
+  const showInactiveCb = document.getElementById('showInactiveUsers');
+  if (showInactiveCb) {
+    showInactiveCb.addEventListener('change', async () => {
+      try { await loadUsers(); } catch (e) { console.warn('Error recargando usuarios al cambiar filtro inactivos', e); }
+    });
+  }
 });
 
 window.searchUsers = searchUsers;
@@ -786,19 +825,31 @@ window.searchUsers = searchUsers;
 function renderUsers(users) {
   const tbody = document.getElementById('usersTable');
   tbody.innerHTML = '';
+  // Respect checkbox: show inactive users only if user enabled that option
+  const showInactive = !!(document.getElementById('showInactiveUsers') && document.getElementById('showInactiveUsers').checked);
 
-  if (!users || users.length === 0) {
+  const filtered = (users || []).filter(u => {
+    const isActive = !((u.activo === false) || (u.active === false) || (String(u.estado || '').toLowerCase() === 'inactivo') || (String(u.estado || '').toLowerCase() === 'inactive'));
+    return showInactive ? true : isActive;
+  });
+
+  if (!filtered || filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7">No hay usuarios</td></tr>';
     return;
   }
 
-  users.forEach(u => {
+  filtered.forEach(u => {
     const tr = document.createElement('tr');
 
     // Usamos los campos devueltos por el backend: `fecha_creacion` y `pedidos_count`.
     const fechaRegistro = u.fecha_creacion ? new Date(u.fecha_creacion).toLocaleString() : '-';
     const pedidosCount = typeof u.pedidos_count !== 'undefined' ? u.pedidos_count : '-';
-    const estado = u.rol === 'cliente' ? 'cliente' : u.rol;
+    // Determinar si el usuario está activo basándonos en distintos campos posibles
+    const isActive = !((u.activo === false) || (u.active === false) || (String(u.estado || '').toLowerCase() === 'inactivo') || (String(u.estado || '').toLowerCase() === 'inactive'));
+    // Render a single toggle button in the 'Estado' column.
+    const estadoText = isActive ? 'Activo' : 'Inactivo';
+    const btnStateClass = isActive ? 'btn-status-active' : 'btn-status-inactive';
+    const btnLabel = isActive ? 'Activo' : 'Inactivo';
 
     tr.innerHTML = `
       <td>${u.id_usuario}</td>
@@ -806,15 +857,38 @@ function renderUsers(users) {
       <td>${escapeHtml(u.correo || '')}</td>
       <td>${fechaRegistro}</td>
       <td>${pedidosCount}</td>
-      <td>${escapeHtml(estado)}</td>
       <td>
-        <button class="btn-secondary" data-action="delete" data-id="${u.id_usuario}">Eliminar</button>
+        <button class="${btnStateClass} status-toggle-btn" data-id="${u.id_usuario}" aria-pressed="${isActive}">${escapeHtml(btnLabel)}</button>
       </td>
+      <td></td>
     `;
 
-    tr.querySelector('[data-action="delete"]').addEventListener('click', () => {
-      confirmWithToast(`Eliminar usuario ${u.nombre} (ID ${u.id_usuario})?`, () => deleteUser(u.id_usuario));
-    });
+    // Attach toggle handler to the status button (single button behavior)
+    const statusBtn = tr.querySelector('.status-toggle-btn');
+    if (statusBtn) {
+      statusBtn.addEventListener('click', async () => {
+        const currentlyActive = statusBtn.getAttribute('aria-pressed') === 'true' || statusBtn.getAttribute('aria-pressed') === 'true';
+        const desired = !currentlyActive;
+        // Call API to toggle
+        const result = await toggleUserActive(u.id_usuario, desired);
+        if (result && (result.success === true || typeof result.activo !== 'undefined')) {
+          // update UI in-place according to server response
+          const nowActive = (typeof result.activo !== 'undefined') ? !!result.activo : !!desired;
+          statusBtn.setAttribute('aria-pressed', nowActive);
+          if (nowActive) {
+            statusBtn.classList.remove('btn-status-inactive');
+            statusBtn.classList.add('btn-status-active');
+            statusBtn.textContent = 'Activo';
+          } else {
+            statusBtn.classList.remove('btn-status-active');
+            statusBtn.classList.add('btn-status-inactive');
+            statusBtn.textContent = 'Inactivo';
+          }
+        } else {
+          // error already shown by toggleUserActive; nothing else to do
+        }
+      });
+    }
 
     tbody.appendChild(tr);
   });
@@ -841,10 +915,36 @@ async function deleteUser(id) {
   }
 }
 
+// Toggle user active/inactive state (frontend -> server). Tries to PATCH the user with { activo: <bool> }.
+async function toggleUserActive(id, active) {
+  try {
+    if (!id) return;
+    const payload = { activo: active };
+    const res = await fetch(`/usuario/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data || (typeof data.success !== 'undefined' && !data.success)) {
+      const msg = (data && data.message) ? data.message : 'No se pudo actualizar el estado del usuario';
+      try { showToast(msg, 'error'); } catch (e) { console.warn(msg); }
+      return data || { success: false };
+    }
+    try { showToast(active ? 'Usuario activado' : 'Usuario inactivado', 'success'); } catch (e) { /* ignore */ }
+    // return parsed response so caller can update UI in-place
+    return data;
+  } catch (err) {
+    console.error('Error actualizando estado de usuario:', err);
+    try { showToast('Error actualizando estado de usuario', 'error'); } catch (e) { /* ignore */ }
+    return { success: false };
+  }
+}
+
 
 function renderOrders(orders) {
   const tbody = document.getElementById('ordersTable');
-  tbody.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="5">No hay pedidos</td></tr>';
 
   if (!orders || orders.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5">No hay pedidos</td></tr>';
@@ -1025,6 +1125,24 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// Try to extract a single, sensible genre string from supplier metadata
+function extractGenreString(raw) {
+  if (!raw && raw !== 0) return '';
+  let s = String(raw || '').trim().toLowerCase();
+  if (!s) return '';
+  // common genre keywords to look for
+  const known = ['terror','ciencia ficción','ciencia ficcion','romance','fantasia','fantasía','misterio','aventura','drama','ficción','ficcion'];
+  for (const k of known) {
+    if (s.indexOf(k) !== -1) {
+      // return capitalized form
+      return k.charAt(0).toUpperCase() + k.slice(1);
+    }
+  }
+  // fallback: take first token separated by comma/semicolon/pipe/slash
+  const tok = s.split(/[,:;|\/\-]/)[0].trim();
+  return tok ? (tok.charAt(0).toUpperCase() + tok.slice(1)) : '';
+}
+
 function safeJsonParse(s) {
   try {
     return JSON.parse(s);
@@ -1048,6 +1166,459 @@ window.closeAddBookModal = closeAddBookModal;
 window.closeOrderDetailsModal = closeOrderDetailsModal;
 window.closeSalesSummaryModal = closeSalesSummaryModal;
 
+// Proveedores y Órdenes de Compra: funciones para modales y formularios
+window.openAddSupplierModal = openAddSupplierModal;
+window.closeAddSupplierModal = closeAddSupplierModal;
+window.openNewPurchaseOrderModal = openNewPurchaseOrderModal;
+window.openEditSupplierModal = openEditSupplierModal;
+window.deleteSupplier = deleteSupplier;
+window.closeNewPurchaseOrderModal = closeNewPurchaseOrderModal;
+window.addPurchaseProduct = addPurchaseProduct;
+window.removePurchaseProduct = removePurchaseProduct;
+
+// Cargar proveedores desde el backend y renderizar en la UI
+async function loadSuppliers() {
+  try {
+    const res = await fetch('/proveedores');
+    const data = await res.json().catch(() => ({}));
+    const list = Array.isArray(data) ? data : (data.proveedores || []);
+    const container = document.getElementById('suppliersContainer');
+    const select = document.getElementById('purchaseSupplier');
+
+    // build a lookup map for quick access elsewhere
+    window.suppliersById = window.suppliersById || {};
+    (list || []).forEach(p => { window.suppliersById[String(p.id)] = p; });
+
+    if (container) {
+      if (!list || list.length === 0) {
+        container.innerHTML = '<p style="color:#999">No hay proveedores registrados</p>';
+      } else {
+        // render suppliers as a table for easier scanning
+        const rows = list.map(p => `
+          <tr>
+            <td>${escapeHtml(String(p.id || ''))}</td>
+            <td>${escapeHtml(p.nombre || p.name || '')}</td>
+            <td>${escapeHtml(p.empresa || p.company || '')}</td>
+            <td>${escapeHtml(p.email || '')}</td>
+            <td>${escapeHtml(p.telefono || p.phone || '')}</td>
+            <td style="max-width:220px; white-space:normal;">${escapeHtml(p.productos || p.products || '')}</td>
+            <td>
+              <button class="btn-secondary" onclick="openEditSupplierModal(${p.id})">Editar</button>
+              <button class="btn-danger" onclick="deleteSupplier(${p.id})">Eliminar</button>
+            </td>
+          </tr>
+        `).join('');
+
+        container.innerHTML = `
+          <div class="table-container">
+            <table class="admin-table suppliers-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Empresa</th>
+                  <th>Email</th>
+                  <th>Teléfono</th>
+                  <th>Tipo de Productos</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+
+    if (select) {
+      select.innerHTML = '<option value="">Seleccione un proveedor</option>' + (list || []).map(p => {
+        const rawGenre = p.genero || p.genre || p.productos || p.products || p.tipo_productos || p.tipoProductos || '';
+        return `
+        <option value="${p.id}" data-genre="${escapeHtml(rawGenre)}">${escapeHtml(p.nombre || p.name || '')}${p.empresa ? ' - ' + escapeHtml(p.empresa) : ''}</option>
+      `}).join('');
+
+      // attach a single change listener (guard to avoid multiple attachments)
+      if (!window._purchaseSupplierListenerAttached) {
+        select.addEventListener('change', () => {
+          const id = select.value;
+          const supplier = (window.suppliersById || {})[id];
+          let rawGenre = '';
+          if (supplier) {
+            rawGenre = supplier.genero || supplier.genre || supplier.productos || supplier.products || supplier.tipo_productos || supplier.tipoProductos || '';
+          } else {
+            const opt = select.options[select.selectedIndex];
+            rawGenre = (opt && opt.getAttribute('data-genre')) || '';
+          }
+          const genre = extractGenreString(rawGenre);
+          document.querySelectorAll('#purchaseProductsList .purchase-genre').forEach(el => el.value = genre || '');
+        });
+        window._purchaseSupplierListenerAttached = true;
+      }
+    }
+  } catch (err) {
+    console.error('Error cargando proveedores:', err);
+  }
+}
+
+function openAddSupplierModal() {
+  const modal = document.getElementById('addSupplierModal');
+  // reset form to ensure creating new supplier by default
+  const form = document.getElementById('addSupplierForm'); if (form) form.reset();
+  const hid = document.getElementById('supplierEditId'); if (hid && hid.parentNode) hid.parentNode.removeChild(hid);
+  if (modal) modal.classList.add('active');
+}
+
+function closeAddSupplierModal() {
+  const modal = document.getElementById('addSupplierModal');
+  if (modal) modal.classList.remove('active');
+  const form = document.getElementById('addSupplierForm'); if (form) form.reset();
+}
+
+// Editar proveedor: abrir modal y precargar datos en el formulario
+async function openEditSupplierModal(id) {
+  try {
+    // ensure suppliers are loaded
+    if (!window.suppliersById || !window.suppliersById[String(id)]) {
+      await loadSuppliers();
+    }
+    const supplier = (window.suppliersById || {})[String(id)];
+    if (!supplier) {
+      showToast('Proveedor no encontrado', 'warning');
+      return;
+    }
+    openAddSupplierModal();
+    // put values into the add supplier form (we'll reuse it for edit)
+    document.getElementById('supplierName').value = supplier.nombre || supplier.name || '';
+    document.getElementById('supplierCompany').value = supplier.empresa || supplier.company || '';
+    document.getElementById('supplierEmail').value = supplier.email || '';
+    document.getElementById('supplierPhone').value = supplier.telefono || supplier.phone || '';
+    document.getElementById('supplierAddress').value = supplier.direccion || supplier.address || '';
+    document.getElementById('supplierProducts').value = supplier.productos || supplier.products || '';
+    // save id in a hidden field so form submit knows to PUT instead of POST
+    let hid = document.getElementById('supplierEditId');
+    if (!hid) {
+      hid = document.createElement('input'); hid.type = 'hidden'; hid.id = 'supplierEditId';
+      const form = document.getElementById('addSupplierForm'); if (form) form.appendChild(hid);
+    }
+    hid.value = String(id);
+  } catch (e) {
+    console.error('openEditSupplierModal error', e);
+    showToast('No se pudo abrir el editor de proveedor', 'error');
+  }
+}
+
+// Eliminar proveedor con confirmación
+async function deleteSupplier(id) {
+  confirmWithToast(`¿Eliminar proveedor #${id}?`, async () => {
+    try {
+      const res = await fetch(`/proveedores/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data && data.success) {
+        showToast('Proveedor eliminado', 'success');
+        await loadSuppliers();
+      } else {
+        console.error('deleteSupplier failed', data);
+        showToast('No se pudo eliminar el proveedor', 'error');
+      }
+    } catch (err) {
+      console.error('Error deleting supplier', err);
+      showToast('Error de red al eliminar proveedor', 'error');
+    }
+  }, () => { /* cancel */ });
+}
+
+// Abrir modal de nueva orden: precargar proveedores y setear fecha
+function openNewPurchaseOrderModal() {
+  loadSuppliers();
+  const modal = document.getElementById('newPurchaseOrderModal');
+  if (!modal) return;
+  // ensure creating a new order (clear any previous id)
+  const formId = document.getElementById('purchaseOrderId'); if (formId) formId.value = '';
+  const supplierSelect = document.getElementById('purchaseSupplier'); if (supplierSelect) supplierSelect.value = '';
+  const notesEl = document.getElementById('purchaseNotes'); if (notesEl) notesEl.value = '';
+  const dateInput = document.getElementById('purchaseDate');
+  if (dateInput) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    dateInput.value = `${yyyy}-${mm}-${dd}`;
+  }
+  // ensure at least one product row
+  const list = document.getElementById('purchaseProductsList');
+  if (list && list.children.length === 0) addPurchaseProduct();
+  updatePurchaseTotal();
+  modal.classList.add('active');
+}
+
+function closeNewPurchaseOrderModal() {
+  const modal = document.getElementById('newPurchaseOrderModal');
+  if (!modal) return;
+  modal.classList.remove('active');
+  const form = document.getElementById('newPurchaseOrderForm'); if (form) form.reset();
+  const list = document.getElementById('purchaseProductsList'); if (list) list.innerHTML = '';
+  const total = document.getElementById('purchaseTotal'); if (total) total.textContent = '0.00';
+}
+
+function addPurchaseProduct() {
+  const list = document.getElementById('purchaseProductsList');
+  if (!list) return;
+  const item = document.createElement('div');
+  item.className = 'purchase-product-item';
+  item.innerHTML = `
+    <input type="text" class="purchase-product-name" placeholder="Nombre del producto / título" />
+    <input type="text" class="purchase-author" placeholder="Autor" />
+    <input type="text" class="purchase-genre" placeholder="Género" />
+    <input type="number" class="purchase-quantity" placeholder="Cantidad" min="1" value="1" />
+    <input type="number" class="purchase-unit-price" placeholder="Precio unitario" min="0" step="0.01" value="0" />
+    <button type="button" class="btn-danger btn-sm" onclick="removePurchaseProduct(this)">
+      <i class="fas fa-trash"></i>
+    </button>
+  `;
+  list.appendChild(item);
+  // initialize genre input from currently selected supplier (if any)
+  try {
+    const supplierSelect = document.getElementById('purchaseSupplier');
+    let initialGenre = '';
+    if (supplierSelect && supplierSelect.value && window.suppliersById && window.suppliersById[String(supplierSelect.value)]) {
+      const sp = window.suppliersById[String(supplierSelect.value)];
+      initialGenre = extractGenreString(sp.genero || sp.genre || sp.productos || sp.products || sp.tipo_productos || sp.tipoProductos || '');
+    } else if (supplierSelect) {
+      const opt = supplierSelect.options[supplierSelect.selectedIndex];
+      initialGenre = (opt && opt.getAttribute('data-genre')) || '';
+      initialGenre = extractGenreString(initialGenre);
+    }
+    const genreInput = item.querySelector('.purchase-genre');
+    if (genreInput) genreInput.value = initialGenre || '';
+  } catch (e) {
+    // non-blocking
+  }
+  // attach listeners for quantity/price changes to update total
+  const qty = item.querySelector('.purchase-quantity');
+  const price = item.querySelector('.purchase-unit-price');
+  [qty, price].forEach(el => {
+    if (!el) return;
+    ['input','change'].forEach(ev => el.addEventListener(ev, updatePurchaseTotal));
+  });
+  updatePurchaseTotal();
+}
+
+function removePurchaseProduct(btn) {
+  const item = btn && btn.closest && btn.closest('.purchase-product-item');
+  if (!item) return;
+  const parent = item.parentNode; if (!parent) return;
+  parent.removeChild(item);
+  updatePurchaseTotal();
+}
+
+function updatePurchaseTotal() {
+  const items = Array.from(document.querySelectorAll('#purchaseProductsList .purchase-product-item'));
+  let total = 0;
+  items.forEach(it => {
+    const qEl = it.querySelector('.purchase-quantity');
+    const pEl = it.querySelector('.purchase-unit-price');
+    // Prefer valueAsNumber for <input type="number"> when available
+    let q = 0;
+    let p = 0;
+    if (qEl && typeof qEl.valueAsNumber === 'number' && !isNaN(qEl.valueAsNumber)) {
+      q = Math.max(0, Math.floor(qEl.valueAsNumber));
+    } else if (qEl) {
+      q = Math.max(0, Math.floor(Number(parseNumberString(qEl.value || qEl.textContent || 0) || 0)));
+    }
+    if (pEl && typeof pEl.valueAsNumber === 'number' && !isNaN(pEl.valueAsNumber)) {
+      p = Number(pEl.valueAsNumber);
+    } else if (pEl) {
+      p = Number(parseNumberString(pEl.value || pEl.textContent || 0) || 0);
+    }
+    total += q * p;
+  });
+  const out = document.getElementById('purchaseTotal');
+  if (out) out.textContent = Number(total || 0).toFixed(2);
+  // debug: if total is zero but there are items, log their raw values (helps detect parsing issues)
+  if (total === 0 && items.length > 0) {
+    try {
+      const debug = items.map(it => ({
+        qty: (it.querySelector('.purchase-quantity') || {}).value,
+        price: (it.querySelector('.purchase-unit-price') || {}).value
+      }));
+      console.debug('purchase total debug:', debug);
+    } catch (e) { /* ignore */ }
+  }
+}
+
+// Manejo de envío de formularios para crear proveedor y crear orden de compra
+document.addEventListener('DOMContentLoaded', () => {
+  // bind add supplier form
+  const sf = document.getElementById('addSupplierForm');
+  if (sf) {
+    // helper validators
+    const emailEl = document.getElementById('supplierEmail');
+    const phoneEl = document.getElementById('supplierPhone');
+    function validateEmail(v) {
+      if (!v) return false;
+      // simple but robust-ish email regex
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+    }
+    function validatePhone(v) {
+      if (!v) return false;
+      const digits = String(v).replace(/[^0-9]/g, '');
+      return digits.length === 10;
+    }
+    function showInputError(elId, msg) {
+      const node = document.getElementById(elId + 'Error');
+      if (node) node.textContent = msg || '';
+    }
+    function clearInputError(elId) {
+      const node = document.getElementById(elId + 'Error');
+      if (node) node.textContent = '';
+    }
+
+    // clear errors while typing
+    if (emailEl) {
+      emailEl.addEventListener('input', () => {
+        if (validateEmail(emailEl.value)) clearInputError('supplierEmail');
+      });
+    }
+    if (phoneEl) {
+      phoneEl.addEventListener('input', () => {
+        if (validatePhone(phoneEl.value)) clearInputError('supplierPhone');
+      });
+    }
+
+    sf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const emailVal = (document.getElementById('supplierEmail') || {}).value || '';
+      const phoneVal = (document.getElementById('supplierPhone') || {}).value || '';
+      let hasError = false;
+      if (!validateEmail(emailVal)) {
+        showInputError('supplierEmail', 'Ingrese un correo válido (ej: usuario@dominio.com)');
+        hasError = true;
+      } else {
+        clearInputError('supplierEmail');
+      }
+      if (!validatePhone(phoneVal)) {
+        showInputError('supplierPhone', 'El teléfono debe tener 10 dígitos numéricos');
+        hasError = true;
+      } else {
+        clearInputError('supplierPhone');
+      }
+      if (hasError) {
+        // focus first invalid field
+        if (!validateEmail(emailVal) && emailEl) emailEl.focus();
+        else if (!validatePhone(phoneVal) && phoneEl) phoneEl.focus();
+        return;
+      }
+
+      const payload = {
+        nombre: (document.getElementById('supplierName') || {}).value || '',
+        empresa: (document.getElementById('supplierCompany') || {}).value || '',
+        email: emailVal,
+        telefono: phoneVal,
+        direccion: (document.getElementById('supplierAddress') || {}).value || '',
+        productos: (document.getElementById('supplierProducts') || {}).value || ''
+      };
+      try {
+        const editIdEl = document.getElementById('supplierEditId');
+        const editId = (editIdEl && editIdEl.value) ? String(editIdEl.value) : '';
+        const url = editId ? `/proveedores/${encodeURIComponent(editId)}` : '/proveedores';
+        const method = editId ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+          method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && data.success) {
+          showToast(editId ? 'Proveedor actualizado' : 'Proveedor creado', 'success');
+          closeAddSupplierModal();
+          // remove edit id if present
+          if (editIdEl && editIdEl.parentNode) editIdEl.parentNode.removeChild(editIdEl);
+          await loadSuppliers();
+        } else {
+          console.error('Error guardando proveedor', data);
+          showToast('No se pudo guardar el proveedor', 'error');
+        }
+      } catch (err) {
+        console.error('Error al guardar proveedor', err);
+        showToast('Error de red al guardar proveedor', 'error');
+      }
+    });
+  }
+
+  // bind new purchase order form
+  const pf = document.getElementById('newPurchaseOrderForm');
+  if (pf) {
+    pf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const supplierId = (document.getElementById('purchaseSupplier') || {}).value;
+      const date = (document.getElementById('purchaseDate') || {}).value;
+      const notes = (document.getElementById('purchaseNotes') || {}).value || '';
+      const items = Array.from(document.querySelectorAll('#purchaseProductsList .purchase-product-item')).map(it => ({
+        // server expects product_name / name and qty / quantity and unit_price
+        product_name: (it.querySelector('.purchase-product-name') || {}).value || '',
+        name: (it.querySelector('.purchase-product-name') || {}).value || '',
+        author: (it.querySelector('.purchase-author') || {}).value || '',
+        genre: (it.querySelector('.purchase-genre') || {}).value || '',
+        quantity: parseInt((it.querySelector('.purchase-quantity') || {value:0}).value, 10) || 0,
+        qty: parseInt((it.querySelector('.purchase-quantity') || {value:0}).value, 10) || 0,
+        unit_price: parseFloat((it.querySelector('.purchase-unit-price') || {value:0}).value) || 0,
+        price: parseFloat((it.querySelector('.purchase-unit-price') || {value:0}).value) || 0
+      })).filter(i => i.product_name || i.quantity > 0);
+      const total = parseFloat((document.getElementById('purchaseTotal') || {textContent:'0'}).textContent) || 0;
+
+      if (!supplierId) { showToast('Seleccione un proveedor', 'warning'); return; }
+      if (!items || items.length === 0) { showToast('Agregue al menos un producto', 'warning'); return; }
+
+      try {
+        const orderId = (document.getElementById('purchaseOrderId') || {}).value || '';
+        const url = orderId ? `/ordenes_compra/${orderId}` : '/ordenes_compra';
+        const method = orderId ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+          method, headers: {'Content-Type':'application/json'}, body: JSON.stringify({ supplier_id: supplierId, date, total, notes, products: items })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && data.success) {
+          showToast(orderId ? 'Orden actualizada' : 'Orden de compra creada', 'success');
+          closeNewPurchaseOrderModal();
+          try { loadPurchaseOrders(); } catch (e) { /* ignore */ }
+          // refresh inventory and books views so newly created products appear without full page reload
+          try { if (typeof loadInventoryReports === 'function') await loadInventoryReports(); } catch (e) { console.warn('loadInventoryReports after purchase save failed', e); }
+          try { if (typeof loadFeaturedBooks === 'function') await loadFeaturedBooks(); } catch (e) { console.warn('loadFeaturedBooks after purchase save failed', e); }
+        } else {
+          console.error('Error guardando orden', data);
+          showToast('No se pudo guardar la orden', 'error');
+        }
+      } catch (err) {
+        console.error('Error al guardar orden', err);
+        showToast('Error de red al guardar orden', 'error');
+      }
+    });
+  }
+
+  // cargar proveedores al iniciar la sección admin (útil para el tab suppliers)
+  try { loadSuppliers(); } catch (e) { /* ignore */ }
+  // attach listeners to any existing purchase product rows in the modal
+  try { attachPurchaseItemListeners(); } catch (e) { /* ignore */ }
+});
+
+// Attach input/change listeners to existing purchase-product-item rows
+function attachPurchaseItemListeners() {
+  const items = Array.from(document.querySelectorAll('#purchaseProductsList .purchase-product-item'));
+  if (!items || items.length === 0) return;
+  items.forEach(it => {
+    const qty = it.querySelector('.purchase-quantity');
+    const price = it.querySelector('.purchase-unit-price');
+    // ensure default values
+    if (qty && (qty.value === '' || qty.value === null)) qty.value = 1;
+    if (price && (price.value === '' || price.value === null)) price.value = 0;
+    [qty, price].forEach(el => {
+      if (!el) return;
+      ['input','change'].forEach(ev => el.addEventListener(ev, updatePurchaseTotal));
+    });
+  });
+  // initial calc
+  try { updatePurchaseTotal(); } catch (e) { /* ignore */ }
+}
 function openAddBookModal() {
   const modal = document.getElementById('addBookModal');
   if (modal) modal.classList.add('active');
@@ -1121,8 +1692,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const author = document.getElementById('bookAuthor').value.trim();
     const genre = (document.getElementById('bookGenre') && document.getElementById('bookGenre').value.trim()) || null;
     const price = parsePriceString(document.getElementById('bookPrice').value);
-    // `stock` and `isbn` removed from UI — backend may handle them separately
-    const stock = undefined;
+    const stockEl = document.getElementById('bookStock');
+    const stock = stockEl ? (parseInt(stockEl.value, 10) || 0) : undefined;
     const isbn = null;
     const image = document.getElementById('bookImage').value.trim() || null;
     const description = document.getElementById('bookDescription').value.trim() || null;
@@ -1174,15 +1745,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Cargar y renderizar libros destacados en la sección 'books'
+// Cargar y renderizar la vista 'Libros' usando los datos del inventario
 async function loadFeaturedBooks() {
   const container = document.getElementById('featuredBooks');
   if (!container) return;
   try {
-    // Ahora se muestra una tabla administrativa: cada fila representa un libro (ISBN único)
-    const res = await fetch('/libros/status');
-    const data = await res.json().catch(() => ({}));
-    const books = (data && data.success && Array.isArray(data.books)) ? data.books : [];
+    // Reuse the inventory endpoint so books added via órdenes de compra aparecen aquí
+    const res = await fetch('/libros');
+    const data = await res.json().catch(() => ([]));
+    const books = Array.isArray(data) ? data : (data.libros || data.books || []);
 
     // Actualizar contador de libros totales
     try {
@@ -1191,48 +1762,248 @@ async function loadFeaturedBooks() {
       const booksCountEl = document.getElementById('booksCount');
       if (booksCountEl) booksCountEl.textContent = `(${books.length})`;
     } catch (e) { /* ignore */ }
-
-    // Construir tabla (incluye columna Imagen y Precio)
-    const rowsHtml = (books || []).map(b => {
-      const imgSrc = b.image || '/abstract-book-cover.png';
-      const priceText = `$${Number(b.price || 0).toFixed(2)}`;
-      return `
-        <tr>
-          <td>${b.id}</td>
-          <td><img src="${imgSrc}" alt="${escapeHtml(b.title||'portada')}" class="book-thumb"> ${escapeHtml(b.title || '')}</td>
-          <td>${escapeHtml(b.author || '')}</td>
-          <td>${priceText}</td>
-          <td>${b.purchased ? '<span style="color:green;font-weight:600">Sí</span>' : '<span style="color:#666">No</span>'}</td>
-          <td>
-            <button class="btn-secondary" onclick="openEditBookModal(${b.id})">Editar</button>
-            <button class="btn-danger" onclick="deleteFeaturedBook(${b.id})">Eliminar</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    container.innerHTML = `
-      <div class="table-container">
-        <table class="admin-table admin-books-table" style="width:100%;">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Título</th>
-              <th>Autor</th>
-              <th>Precio</th>
-              <th>Comprado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-      </div>
-    `;
+    // Cachear libros para permitir filtrado en cliente y renderizar mediante helper
+    window._adminBooksCache = books || [];
+    renderFeaturedBooksTable(window._adminBooksCache);
+    return;
   } catch (err) {
-    console.error('Error cargando libros destacados:', err);
-    container.innerHTML = '<p>No se pudieron cargar libros destacados.</p>';
+    console.error('Error cargando libros (inventario):', err);
+    container.innerHTML = '<p>No se pudieron cargar los libros.</p>';
+  }
+}
+
+// Render helper para la tabla de libros (puede usarse con subconjuntos filtrados)
+function renderFeaturedBooksTable(books) {
+  const container = document.getElementById('featuredBooks');
+  if (!container) return;
+  const rowsHtml = (books || []).map(b => {
+    const imgSrc = b.image || b.imagen || '/abstract-book-cover.png';
+    const priceText = `$${Number(b.price || b.precio || 0).toFixed(2)}`;
+    const qty = Number(b.stock || b.cantidad || b.qty || 0) || 0;
+    return `
+      <tr>
+        <td>${escapeHtml(String(b.id || b.ID || ''))}</td>
+        <td><img src="${imgSrc}" alt="${escapeHtml(b.title||b.nombre||'portada')}" class="book-thumb"> ${escapeHtml(b.title || b.nombre || b.titulo || '')}</td>
+        <td>${escapeHtml(b.author || b.autor || '')}</td>
+        <td>${priceText}</td>
+        <td>${escapeHtml(String(qty))}</td>
+        <td style="display:flex; gap:8px; align-items:center;">
+          <img src="${imgSrc}" alt="thumb" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #eee;" />
+          <button class="btn-secondary" onclick="setBookImageUrl(${b.id || b.ID || ''})">Establecer URL</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="table-container">
+      <table class="admin-table admin-books-table" style="width:100%;">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Título</th>
+            <th>Autor</th>
+            <th>Precio Unitario</th>
+            <th>Cantidad</th>
+            <th>Imagen</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Normalizar cadenas (quita acentos y pasa a minúsculas)
+function normalizeAdminString(s) {
+  if (!s && s !== 0) return '';
+  try {
+    return String(s).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  } catch (e) {
+    return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+}
+
+// Aplicar filtro en cliente usando cache local
+function applyAdminBookFilter() {
+  const q = (document.getElementById('admin-book-search') || {}).value || '';
+  const field = (document.getElementById('admin-search-field') || {}).value || 'all';
+  const raw = window._adminBooksCache || [];
+  const term = normalizeAdminString(q.trim());
+  if (!term) {
+    renderFeaturedBooksTable(raw);
+    return;
+  }
+  const filtered = raw.filter(b => {
+    if (field === 'author') {
+      return normalizeAdminString(b.author || b.autor || '').indexOf(term) !== -1;
+    } else if (field === 'title') {
+      return normalizeAdminString(b.title || b.titulo || b.nombre || '').indexOf(term) !== -1;
+    } else {
+      // search both
+      const a = normalizeAdminString(b.author || b.autor || '');
+      const t = normalizeAdminString(b.title || b.titulo || b.nombre || '');
+      return a.indexOf(term) !== -1 || t.indexOf(term) !== -1;
+    }
+  });
+  renderFeaturedBooksTable(filtered);
+}
+
+// Adjuntar listeners al DOM para búsqueda admin
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('admin-book-search');
+  const sel = document.getElementById('admin-search-field');
+  const clearBtn = document.getElementById('admin-search-clear');
+  if (input) input.addEventListener('input', applyAdminBookFilter);
+  if (sel) sel.addEventListener('change', applyAdminBookFilter);
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    if (input) input.value = '';
+    if (sel) sel.value = 'all';
+    applyAdminBookFilter();
+  });
+  // Credentials form handling: validar y enviar cambio de contraseña
+  const credForm = document.getElementById('credentialsForm');
+  if (credForm) {
+    credForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const curPwdEl = document.getElementById('currentPassword');
+      const newPwdEl = document.getElementById('newPassword');
+      const confPwdEl = document.getElementById('confirmNewPassword');
+      const notifyEl = document.getElementById('notifyByEmail');
+      // identifier removed: password change allowed without email/usuario
+      const currentPassword = curPwdEl ? String(curPwdEl.value || '') : '';
+      const newPassword = newPwdEl ? String(newPwdEl.value || '') : '';
+      const confirmPassword = confPwdEl ? String(confPwdEl.value || '') : '';
+      const newEmailEl = document.getElementById('newEmail');
+      const confEmailEl = document.getElementById('confirmNewEmail');
+      const newEmail = newEmailEl ? String(newEmailEl.value || '').trim() : '';
+      const confirmEmail = confEmailEl ? String(confEmailEl.value || '').trim() : '';
+      const notify = notifyEl ? String(notifyEl.value || 'yes') === 'yes' : true;
+      // Validaciones básicas
+      // Debe haber al menos un cambio: nueva contraseña o nuevo email
+      if (!newPassword && !newEmail) { showToast('Ingrese nueva contraseña o nuevo email para actualizar', 'error'); return; }
+      // Si se solicita cambiar la contraseña, la contraseña actual es obligatoria
+      if (newPassword) {
+        if (!currentPassword) { showToast('Ingrese su contraseña actual para cambiar la contraseña', 'error'); if (curPwdEl) curPwdEl.focus(); return; }
+        if (newPassword.length < 8) { showToast('La nueva contraseña debe tener al menos 8 caracteres', 'error'); if (newPwdEl) newPwdEl.focus(); return; }
+        if (newPassword !== confirmPassword) { showToast('Las contraseñas no coinciden', 'error'); if (confPwdEl) confPwdEl.focus(); return; }
+      }
+      if (newEmail) {
+        // simple email regex
+        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRe.test(newEmail)) { showToast('Ingrese un email válido', 'error'); if (newEmailEl) newEmailEl.focus(); return; }
+        if (newEmail !== confirmEmail) { showToast('Los emails no coinciden', 'error'); if (confEmailEl) confEmailEl.focus(); return; }
+      }
+
+      // Deshabilitar botón de submit mientras se procesa
+      const submitBtn = credForm.querySelector('button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Procesando...'; }
+
+      try {
+        const payload = { currentPassword, notify };
+        if (newPassword) payload.newPassword = newPassword;
+        if (newEmail) payload.newEmail = newEmail;
+        const res = await fetch('/admin/credenciales', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && (data && (data.success || data.updated))) {
+          showToast('Credenciales actualizadas correctamente', 'success');
+          // limpiar campos
+          if (curPwdEl) curPwdEl.value = '';
+          if (newPwdEl) newPwdEl.value = '';
+          if (confPwdEl) confPwdEl.value = '';
+        } else {
+          const msg = (data && data.message) ? data.message : 'No se pudieron actualizar las credenciales';
+          showToast(msg, 'error');
+        }
+      } catch (err) {
+        console.error('Error actualizando credenciales:', err);
+        showToast('Error de red al actualizar credenciales', 'error');
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Actualizar credenciales'; }
+      }
+    });
+  }
+
+  // General settings form: permitir cambiar sólo el email desde este formulario
+  const genForm = document.getElementById('generalSettings');
+  if (genForm) {
+    genForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const newEmailEl = document.getElementById('newEmail');
+      const confEmailEl = document.getElementById('confirmNewEmail');
+      const newEmail = newEmailEl ? String(newEmailEl.value || '').trim() : '';
+      const confEmail = confEmailEl ? String(confEmailEl.value || '').trim() : '';
+
+      if (!newEmail) {
+        // If no email provided, allow form to proceed as normal (no-op here)
+        showToast('Completa el campo de nuevo email para actualizar', 'error');
+        return;
+      }
+
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRe.test(newEmail)) { showToast('Ingrese un email válido', 'error'); if (newEmailEl) newEmailEl.focus(); return; }
+      if (newEmail !== confEmail) { showToast('Los emails no coinciden', 'error'); if (confEmailEl) confEmailEl.focus(); return; }
+
+      const submitBtn = genForm.querySelector('button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Procesando...'; }
+
+      try {
+        const res = await fetch('/admin/credenciales', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ newEmail })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && data.success) {
+          showToast('Email actualizado correctamente', 'success');
+          if (newEmailEl) newEmailEl.value = '';
+          if (confEmailEl) confEmailEl.value = '';
+        } else {
+          const msg = (data && data.message) ? data.message : 'No se pudo actualizar el email';
+          showToast(msg, 'error');
+        }
+      } catch (err) {
+        console.error('Error actualizando email:', err);
+        showToast('Error de red al actualizar email', 'error');
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Guardar Cambios'; }
+      }
+    });
+  }
+});
+
+// Abrir prompt para establecer una URL de imagen y guardar en el servidor
+async function setBookImageUrl(id) {
+  if (!id) return;
+  const url = prompt('Ingrese la URL de la imagen para este libro (vaciar para quitar):');
+  if (url === null) return; // cancel
+  const trimmed = (String(url || '').trim()) || null;
+  try {
+    const res = await fetch(`/libros/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: trimmed })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data && data.success) {
+      showToast('Imagen actualizada', 'success');
+      await loadFeaturedBooks();
+      try { loadInventoryReports(); } catch (e) { /* ignore */ }
+    } else {
+      console.error('Error actualizando imagen:', data);
+      showToast('No se pudo actualizar la imagen', 'error');
+    }
+  } catch (err) {
+    console.error('Error guardando imagen en servidor', err);
+    showToast('Error de red al actualizar imagen', 'error');
   }
 }
 
@@ -1406,7 +2177,7 @@ async function openEditBookModal(id) {
     document.getElementById('bookPrice').value = book.price || 0;
     document.getElementById('bookImage').value = book.image || '';
     document.getElementById('bookDescription').value = book.description || '';
-    // `stock` and `isbn` are managed server-side — no UI inputs to prefill
+    const stockEl = document.getElementById('bookStock'); if (stockEl) stockEl.value = (book.stock || book.cantidad || 0);
     const gEl = document.getElementById('bookGenre'); if (gEl) gEl.value = book.genre || '';
 
     const modal = document.getElementById('addBookModal');
@@ -1443,3 +2214,305 @@ async function deleteFeaturedBook(id) {
 }
 
 // (Favoritos en admin eliminados: la funcionalidad de favoritos queda sólo en la vista cliente)
+
+// --- Inventory tabs and purchase orders loader ---
+function initInventoryTabs() {
+  const tabs = Array.from(document.querySelectorAll('.inventory-tab'));
+  if (!tabs || tabs.length === 0) return;
+  tabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      const name = tab.dataset.tab;
+      // toggle active on tabs
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // show/hide contents
+      const contents = Array.from(document.querySelectorAll('.inventory-tab-content'));
+      contents.forEach(c => c.classList.remove('active'));
+      const target = document.getElementById(`${name}-tab`);
+      if (target) target.classList.add('active');
+
+      // load data per tab
+      if (name === 'suppliers') {
+        try { loadSuppliers(); } catch (e) { console.warn('loadSuppliers failed', e); }
+      }
+      if (name === 'purchase-orders') {
+        try { loadPurchaseOrders(); } catch (e) { console.warn('loadPurchaseOrders failed', e); }
+      }
+      if (name === 'stock') {
+        try { loadInventoryReports(); } catch (e) { console.warn('loadInventoryReports failed', e); }
+      }
+    });
+  });
+}
+
+async function loadPurchaseOrders(filter) {
+  const tbody = document.getElementById('purchaseOrdersTable');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6">Cargando órdenes...</td></tr>';
+  try {
+    const res = await fetch('/ordenes_compra');
+    const data = await res.json().catch(() => ({}));
+    const list = Array.isArray(data) ? data : (data.orders || data.ordenes || data.purchase_orders || []);
+    if (!list || list.length === 0) {
+      tbody.innerHTML = '<tr class="empty-state"><td colspan="6" style="text-align:center; padding:2rem; color:#999;">No hay órdenes de compra registradas</td></tr>';
+      return;
+    }
+
+    // apply client-side filters if provided
+    let filtered = list;
+    try {
+      const provider = filter && filter.provider ? String(filter.provider).trim().toLowerCase() : '';
+      const from = filter && filter.from ? String(filter.from) : '';
+      const to = filter && filter.to ? String(filter.to) : '';
+      if (provider) {
+        filtered = filtered.filter(po => (String(po.supplier_nombre || po.supplier || '').toLowerCase().includes(provider)));
+      }
+      if (from) {
+        const fromTs = new Date(from).setHours(0,0,0,0);
+        filtered = filtered.filter(po => { const d = po.date ? new Date(po.date).setHours(0,0,0,0) : null; return d !== null ? d >= fromTs : true; });
+      }
+      if (to) {
+        const toTs = new Date(to).setHours(23,59,59,999);
+        filtered = filtered.filter(po => { const d = po.date ? new Date(po.date).getTime() : null; return d !== null ? d <= toTs : true; });
+      }
+    } catch (e) {
+      console.warn('Error applying purchase filters', e);
+    }
+
+    tbody.innerHTML = filtered.map(po => {
+      const supplier = (po.supplier_nombre || po.supplier || po.proveedor || '—');
+      const items = (po.items && Array.isArray(po.items)) ? po.items : [];
+      const date = po.date ? escapeHtml(String(po.date)) : '';
+      const total = (typeof po.total !== 'undefined') ? Number(po.total).toFixed(2) : (po.total_amount ? Number(po.total_amount).toFixed(2) : '0.00');
+      const productsHtml = (Array.isArray(items) && items.length > 0)
+        ? items.map(it => `${escapeHtml(it.product_name || it.title || it.name || '')} x${escapeHtml(String(it.quantity || it.qty || 0))}`).join('<br/>')
+        : '—';
+
+      return `
+        <tr>
+          <td>${escapeHtml(String(po.id || ''))}</td>
+          <td>${escapeHtml(supplier)}</td>
+          <td>${date}</td>
+          <td style="max-width:280px; white-space:normal;">${productsHtml}</td>
+          <td>$${escapeHtml(String(total))}</td>
+          <td>
+            <button class="btn-secondary" onclick="editPurchaseOrder(${po.id})">Editar</button>
+            <button class="btn-danger" onclick="deletePurchaseOrder(${po.id})">Eliminar</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error cargando órdenes de compra', err);
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#b00;">Error cargando órdenes</td></tr>';
+  }
+}
+
+// Abrir orden en modal para editar
+async function editPurchaseOrder(id) {
+  if (!id) return;
+  try {
+    const res = await fetch(`/ordenes_compra/${id}`);
+    const data = await res.json().catch(() => ({}));
+    if (!data || (!data.success && !data.id && !data.order && !data.purchase_order)) {
+      showToast('No se pudo cargar la orden para editar', 'error');
+      return;
+    }
+    const po = data.order || data.purchase_order || data || {};
+    // populate modal fields
+    const formId = document.getElementById('purchaseOrderId');
+    if (formId) formId.value = po.id || po.ID || po.id_orden || '';
+    const supplierSelect = document.getElementById('purchaseSupplier');
+    if (supplierSelect) supplierSelect.value = po.supplier_id || po.supplierId || po.supplier_id || '';
+    const dateInput = document.getElementById('purchaseDate'); if (dateInput) dateInput.value = po.date ? String(po.date).split('T')[0] : '';
+    const notes = document.getElementById('purchaseNotes'); if (notes) notes.value = po.notes || '';
+
+    // fill products
+    const list = document.getElementById('purchaseProductsList'); if (!list) return;
+    list.innerHTML = '';
+    const items = po.items || po.products || [];
+    if (Array.isArray(items) && items.length > 0) {
+      items.forEach(it => {
+        const item = document.createElement('div');
+        item.className = 'purchase-product-item';
+        item.innerHTML = `
+          <input type="text" class="purchase-product-name" placeholder="Nombre del producto / título" value="${escapeHtml(it.title || it.name || it.product || '')}" />
+          <input type="text" class="purchase-author" placeholder="Autor" value="${escapeHtml(it.author || '')}" />
+          <input type="text" class="purchase-genre" placeholder="Género" value="${escapeHtml(it.genre || '')}" />
+          <input type="number" class="purchase-quantity" placeholder="Cantidad" min="1" value="${escapeHtml(String(it.quantity || it.qty || it.cantidad || 1))}" />
+          <input type="number" class="purchase-unit-price" placeholder="Precio unitario" min="0" step="0.01" value="${escapeHtml(String(it.unit_price || it.price || 0))}" />
+          <button type="button" class="btn-danger btn-sm" onclick="removePurchaseProduct(this)">
+            <i class="fas fa-trash"></i>
+          </button>
+        `;
+        list.appendChild(item);
+        const qty = item.querySelector('.purchase-quantity');
+        const price = item.querySelector('.purchase-unit-price');
+        [qty, price].forEach(el => {
+          if (!el) return;
+          ['input','change'].forEach(ev => el.addEventListener(ev, updatePurchaseTotal));
+        });
+      });
+    } else {
+      addPurchaseProduct();
+    }
+    updatePurchaseTotal();
+
+    // open modal
+    const modal = document.getElementById('newPurchaseOrderModal'); if (modal) modal.classList.add('active');
+  } catch (err) {
+    console.error('editPurchaseOrder error', err);
+    showToast('Error cargando orden', 'error');
+  }
+}
+
+async function deletePurchaseOrder(id) {
+  if (!id) return;
+  confirmWithToast('¿Eliminar esta orden de compra?', async () => {
+    try {
+      const res = await fetch(`/ordenes_compra/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data && data.success) {
+        showToast('Orden eliminada', 'success');
+        try { loadPurchaseOrders(); } catch (e) { /* ignore */ }
+        try { loadInventoryReports(); } catch (e) { /* ignore */ }
+      } else {
+        console.error('Error eliminando orden', data);
+        showToast('No se pudo eliminar la orden', 'error');
+      }
+    } catch (err) {
+      console.error('deletePurchaseOrder error', err);
+      showToast('Error de red al eliminar orden', 'error');
+    }
+  });
+}
+
+async function viewPurchaseOrder(id) {
+  if (!id) return;
+  try {
+    const res = await fetch(`/ordenes_compra/${id}`);
+    const data = await res.json();
+    const modal = document.getElementById('orderDetailsModal');
+    const content = document.getElementById('orderDetailsContent');
+    if (!modal || !content) return;
+    if (!data || !data.success) {
+      content.innerHTML = `<div style="padding:12px;">No se pudo cargar la orden.</div>`;
+    } else {
+      const po = data.order || data.purchase_order || data.data || data;
+      const items = po.items || po.products || [];
+      const itemsHtml = (Array.isArray(items) && items.length > 0) ? items.map(it => `<li>${escapeHtml(it.title || it.name || it.product || '')} — ${escapeHtml(String(it.quantity || it.qty || it.cantidad || ''))} u — $${Number(it.unit_price || it.price || 0).toFixed(2)}</li>`).join('') : '<li>No hay items</li>';
+      content.innerHTML = `
+        <div style="padding:12px;">
+          <h4>Orden #${escapeHtml(String(po.id || ''))}</h4>
+          <p><strong>Proveedor:</strong> ${escapeHtml(po.supplier_nombre || po.proveedor || po.supplier || '')}</p>
+          <p><strong>Fecha:</strong> ${escapeHtml(String(po.date || ''))}</p>
+          <p><strong>Total:</strong> $${Number(po.total || 0).toFixed(2)}</p>
+          <h5>Items</h5>
+          <ul style="padding-left:1rem">${itemsHtml}</ul>
+          <div style="text-align:right; margin-top:12px;\"><button class="btn-secondary" onclick="closeOrderDetailsModal()">Cerrar</button></div>
+        </div>
+      `;
+    }
+    modal.classList.add('active');
+  } catch (err) {
+    console.error('viewPurchaseOrder error', err);
+  }
+}
+
+// export for HTML onclick handlers
+window.initInventoryTabs = initInventoryTabs;
+window.loadPurchaseOrders = loadPurchaseOrders;
+window.viewPurchaseOrder = viewPurchaseOrder;
+window.editPurchaseOrder = editPurchaseOrder;
+window.deletePurchaseOrder = deletePurchaseOrder;
+window.filterPurchaseOrders = filterPurchaseOrders;
+
+function filterPurchaseOrders() {
+  const q = (document.getElementById('purchaseSupplierSearch') || {}).value || '';
+  const from = (document.getElementById('purchaseDateFrom') || {}).value || '';
+  const to = (document.getElementById('purchaseDateTo') || {}).value || '';
+  loadPurchaseOrders({ provider: q, from, to });
+}
+
+// --- Inventory loader: carga libros y llena la tabla de stock ---
+async function loadInventoryReports() {
+  const tbody = document.getElementById('inventoryReport');
+  const stats = document.getElementById('inventoryStats');
+  if (stats) stats.innerHTML = '';
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8">Cargando inventario...</td></tr>';
+  try {
+    const res = await fetch('/libros');
+    const data = await res.json().catch(() => ([]));
+    const list = Array.isArray(data) ? data : (data.libros || data.books || []);
+    if (!list || list.length === 0) {
+      tbody.innerHTML = '<tr class="empty-state"><td colspan="8" style="text-align:center; padding:2rem; color:#999;">No hay productos en el inventario</td></tr>';
+      return;
+    }
+
+    // render stats
+    if (stats) {
+      const totalItems = list.reduce((s, i) => s + (Number(i.stock || 0) || 0), 0);
+      const totalProducts = list.length;
+      stats.innerHTML = `\
+        <div class="stat-card"><div class="stat-info"><h3>${totalProducts}</h3><p>Productos</p></div></div>\
+        <div class="stat-card"><div class="stat-info"><h3>${totalItems}</h3><p>Unidades en stock</p></div></div>\
+      `;
+    }
+
+    tbody.innerHTML = list.map(b => `
+      <tr>
+        <td>${escapeHtml(String(b.id || b.ID || ''))}</td>
+        <td>${escapeHtml(b.title || b.nombre || b.titulo || '')}</td>
+        <td>${escapeHtml(b.author || b.autor || '')}</td>
+        <td>${escapeHtml(b.genre || b.genero || '')}</td>
+        <td>$${Number(b.price || b.precio || 0).toFixed(2)}</td>
+        <td>${escapeHtml(String(b.stock || b.cantidad || 0))}</td>
+        <td>
+          <button class="btn-primary" onclick="openEditBookModal(${b.id || b.ID || ''})">Editar</button>
+          <button class="btn-danger" onclick="deleteInventoryBook(${b.id || b.ID || ''})" style="margin-left:8px;">Eliminar</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error cargando inventario', err);
+    tbody.innerHTML = '<tr><td colspan="8" style="color:#b00;">Error cargando inventario</td></tr>';
+  }
+}
+
+async function deleteInventoryBook(id) {
+  confirmWithToast('¿Eliminar este producto del inventario?', async () => {
+    try {
+      const res = await fetch(`/libros/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && (data.success || data.deleted)) {
+        try { showToast('Producto eliminado del inventario', 'success'); } catch (e) { /* ignore */ }
+        // refrescar las vistas relacionadas: inventario, libros y órdenes de compra
+        try { await loadInventoryReports(); } catch (e) { console.warn('loadInventoryReports after delete failed', e); }
+        try { if (typeof loadFeaturedBooks === 'function') await loadFeaturedBooks(); } catch (e) { console.warn('loadFeaturedBooks after delete failed', e); }
+        try { if (typeof loadPurchaseOrders === 'function') await loadPurchaseOrders(); } catch (e) { console.warn('loadPurchaseOrders after delete failed', e); }
+      } else {
+        console.error('Error eliminando producto:', data || res.status);
+        try { showToast('No se pudo eliminar el producto', 'error'); } catch (e) { /* ignore */ }
+      }
+    } catch (err) {
+      console.error('Error en deleteInventoryBook:', err);
+      try { showToast('Error de red', 'error'); } catch (e) { /* ignore */ }
+    }
+  }, () => {
+    try { showToast('Eliminación cancelada', 'info') } catch (e) { /* ignore */ }
+  });
+}
+
+window.deleteInventoryBook = deleteInventoryBook;
+
+window.loadInventoryReports = loadInventoryReports;
+
+// Expose toggle helper for debugging or inline usage
+window.toggleUserActive = toggleUserActive;
+
+// Ensure inventory tabs initialize after DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  try { initInventoryTabs(); } catch (e) { /* ignore */ }
+});

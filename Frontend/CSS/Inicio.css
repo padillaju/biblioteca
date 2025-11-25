@@ -122,6 +122,26 @@ nav {
     justify-content: center;
 }
 
+/* Clear (x) button next to the search input */
+.search-clear {
+    background: transparent;
+    border: none;
+    color: #666;
+    font-size: 16px;
+    padding: 6px 8px;
+    margin-left: 6px;
+    cursor: pointer;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.search-clear:hover { background: rgba(0,0,0,0.04); color: #333; }
+
+/* Ensure search-bar elements align nicely */
+.search-bar { display:flex; align-items:center; gap:8px; }
+.search-bar input#search-input { flex: 1 1 auto; }
+
 .search-btn i { 
     font-size: 0.95rem; 
 

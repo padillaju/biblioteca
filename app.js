@@ -161,6 +161,405 @@ app.get('/login.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'Frontend', 'HTML', 'login.html'));
 });
 
+// Listar proveedores
+app.get('/proveedores', async (req, res) => {
+  try {
+    // Determine available columns to choose a safe ORDER BY
+    let orderBy = '';
+    try {
+      const [cols] = await db.promise().query("SHOW COLUMNS FROM proveedores");
+      const colNames = (cols || []).map(c => c.Field);
+      if (colNames.includes('created_at')) orderBy = 'created_at';
+      else if (colNames.includes('id')) orderBy = 'id';
+      else if (colNames.includes('nombre')) orderBy = 'nombre';
+    } catch (e) {
+      // If SHOW COLUMNS fails, continue without orderBy
+      console.warn('No se pudieron leer columnas de proveedores:', e && e.message);
+    }
+
+    const sql = `SELECT * FROM proveedores ${orderBy ? ('ORDER BY ' + orderBy + ' DESC') : ''}`;
+    const [rows] = await db.promise().query(sql);
+
+    // Normalize rows to expected keys for the frontend
+    const normalized = (rows || []).map(r => ({
+      id: r.id || r.id_proveedor || r.idProveedor || r.ID || null,
+      nombre: r.nombre || r.name || r.nombre_proveedor || r.proveedor || '',
+      empresa: r.empresa || r.company || r.empresa_proveedor || '',
+      email: r.email || r.correo || r.mail || '',
+      telefono: r.telefono || r.phone || r.celular || '',
+      direccion: r.direccion || r.address || '',
+      productos: r.productos || r.products || r.tipo_productos || '',
+      created_at: r.created_at || r.createdAt || r.fecha_creacion || null,
+      raw: r
+    }));
+
+    res.json(normalized);
+  } catch (err) {
+    console.error('Error obteniendo proveedores:', err);
+    res.status(500).json({ success: false, message: 'Error al obtener proveedores' });
+  }
+});
+
+// Crear proveedor
+app.post('/proveedores', async (req, res) => {
+  try {
+    const { name, company, email, phone, address, products } = req.body;
+    // Aceptar también claves en español/alternativas
+    const nombre = name || req.body.nombre || '';
+    const empresa = company || req.body.company || req.body.empresa || '';
+    const correo = email || req.body.email || req.body.correo || '';
+    const telefono = phone || req.body.phone || req.body.telefono || '';
+    const direccion = address || req.body.address || '';
+    const productos = products || req.body.products || '';
+
+    const sql = 'INSERT INTO proveedores (nombre, empresa, email, telefono, direccion, productos) VALUES (?, ?, ?, ?, ?, ?)';
+    const [result] = await db.promise().query(sql, [nombre, empresa, correo, telefono, direccion, productos]);
+    res.json({ success: true, id: result.insertId });
+  } catch (err) {
+    console.error('Error creando proveedor:', err);
+    res.status(500).json({ success: false, message: 'Error al crear proveedor' });
+  }
+});
+
+// Eliminar proveedor
+app.delete('/proveedores/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ success: false, message: 'ID requerido' });
+    // Detectar columna de ID real para evitar usar una columna inexistente 'id'
+    let idCol = null;
+    try {
+      const [cols] = await db.promise().query('SHOW COLUMNS FROM proveedores');
+      const colNames = (cols || []).map(c => String(c.Field || '').toLowerCase());
+      const candidates = ['id', 'id_proveedor', 'idproveedor', 'id_prov', 'idProveedor', 'ID'];
+      for (const cand of candidates) {
+        if (colNames.indexOf(String(cand).toLowerCase()) !== -1) {
+          idCol = cols[colNames.indexOf(String(cand).toLowerCase())].Field;
+          break;
+        }
+      }
+      if (!idCol && colNames.length > 0) idCol = cols[0].Field;
+    } catch (e) {
+      idCol = 'id';
+    }
+
+    const sql = `DELETE FROM proveedores WHERE ${idCol} = ?`;
+    const [result] = await db.promise().query(sql, [id]);
+    if (result && result.affectedRows && result.affectedRows > 0) {
+      return res.json({ success: true });
+    }
+    return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
+  } catch (err) {
+    console.error('Error eliminando proveedor:', err);
+    res.status(500).json({ success: false, message: 'Error eliminando proveedor' });
+  }
+});
+
+// Actualizar proveedor
+app.put('/proveedores/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ success: false, message: 'ID requerido' });
+    const nombre = req.body.nombre || req.body.name || '';
+    const empresa = req.body.empresa || req.body.company || '';
+    const correo = req.body.email || req.body.correo || '';
+    const telefono = req.body.telefono || req.body.phone || req.body.celular || '';
+    const direccion = req.body.direccion || req.body.address || '';
+    const productos = req.body.productos || req.body.products || '';
+
+    // Detectar columna de ID real en la tabla `proveedores` para evitar errores si no existe `id`.
+    let idCol = null;
+    try {
+      const [cols] = await db.promise().query('SHOW COLUMNS FROM proveedores');
+      const colNames = (cols || []).map(c => String(c.Field || '').toLowerCase());
+      const candidates = ['id', 'id_proveedor', 'idproveedor', 'id_prov', 'idProveedor', 'ID'];
+      for (const cand of candidates) {
+        if (colNames.indexOf(String(cand).toLowerCase()) !== -1) {
+          idCol = cols[colNames.indexOf(String(cand).toLowerCase())].Field;
+          break;
+        }
+      }
+      // fallback a la primera columna si nada coincide
+      if (!idCol && colNames.length > 0) idCol = cols[0].Field;
+    } catch (e) {
+      // si SHOW COLUMNS falla, usar 'id' por compatibilidad y dejar que la consulta devuelva 0 filas
+      idCol = 'id';
+    }
+
+    // Construir consulta de actualización usando la columna detectada
+    const sql = `UPDATE proveedores SET nombre = ?, empresa = ?, email = ?, telefono = ?, direccion = ?, productos = ? WHERE ${idCol} = ? LIMIT 1`;
+    const params = [nombre, empresa, correo, telefono, direccion, productos, id];
+    const [result] = await db.promise().query(sql, params);
+    if (result && result.affectedRows && result.affectedRows > 0) {
+      return res.json({ success: true });
+    }
+    return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
+  } catch (err) {
+    console.error('Error actualizando proveedor:', err);
+    res.status(500).json({ success: false, message: 'Error al actualizar proveedor', error: err && (err.sqlMessage || err.message) });
+  }
+});
+
+// Crear orden de compra con items
+app.post('/ordenes_compra', async (req, res) => {
+  try {
+    const { supplier_id, date, delivery_date, notes, products, total } = req.body;
+    if (!supplier_id) return res.status(400).json({ success: false, message: 'Proveedor requerido' });
+    const sql = 'INSERT INTO purchase_orders (supplier_id, date, delivery_date, total, notes) VALUES (?, ?, ?, ?, ?)';
+    const [result] = await db.promise().query(sql, [supplier_id, date || null, delivery_date || null, Number(total || 0), notes || '']);
+    const orderId = result.insertId;
+    if (Array.isArray(products) && products.length > 0) {
+      const values = products.map(p => [orderId, p.name || p.product_name || '', Number(p.qty || p.quantity || 0), Number(p.price || p.unit_price || 0)]);
+      const placeholders = values.map(() => '(?, ?, ?, ?)').join(',');
+      const flat = values.reduce((a, b) => a.concat(b), []);
+      const insertItemsSql = `INSERT INTO purchase_order_items (order_id, product_name, quantity, unit_price) VALUES ${placeholders}`;
+      await db.promise().query(insertItemsSql, flat);
+      // For each product, upsert into `libros`: if exists (by title) increment stock and update price, otherwise insert new book record
+      try {
+        console.log(`Sincronizando ${products.length} items de la orden ${orderId} con tabla libros`);
+        for (const p of products) {
+          const name = (p.name || p.product_name || '').toString().trim();
+          const qty = Number(p.qty || p.quantity || 0) || 0;
+          const price = Number(p.price || p.unit_price || 0) || 0;
+          // intentar obtener autor y género si vienen en el payload
+          const author = (p.author || p.autor || p.authors || p.author_name || p.autores || '').toString().trim();
+          const genre = (p.genre || p.genero || p.category || p.categoria || '').toString().trim() || null;
+          if (!name) continue;
+          console.log(' -> product:', { name, qty, price, author, genre });
+          // Try to find existing libro by title (case-insensitive)
+          const [found] = await db.promise().query('SELECT id, IFNULL(stock,0) AS stock FROM libros WHERE LOWER(title) = LOWER(?) LIMIT 1', [name]);
+          if (found && found.length > 0) {
+            const existing = found[0];
+            const newStock = (Number(existing.stock || 0) + qty) || qty;
+            const [upRes] = await db.promise().query('UPDATE libros SET stock = ?, price = ? WHERE id = ?', [newStock, price, existing.id]);
+            console.log(`   actualizado libro id=${existing.id} stock:${existing.stock} -> ${newStock} affectedRows=${upRes.affectedRows}`);
+            } else {
+            // Insert a libro record using author/genre from payload when available
+            const [ins] = await db.promise().query(
+              'INSERT INTO libros (title, author, genre, price, image, description, stock) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [name, author || '', genre || null, price, null, null, qty]
+            );
+            console.log(`   insertado nuevo libro id=${ins.insertId} stock=${qty} author=${author || ''} genre=${genre || ''}`);
+          }
+        }
+      } catch (syncErr) {
+        console.warn('No se pudo sincronizar items de orden con la tabla libros:', syncErr && (syncErr.message || syncErr.sqlMessage || syncErr));
+      }
+    }
+    res.json({ success: true, id: orderId });
+  } catch (err) {
+    console.error('Error creando orden de compra:', err);
+    res.status(500).json({ success: false, message: 'Error al crear orden de compra', error: err && (err.sqlMessage || err.message) });
+  }
+});
+
+// Listar órdenes de compra con sus items y nombre de proveedor
+app.get('/ordenes_compra', async (req, res) => {
+  try {
+    // Intentar detectar la columna PK real de la tabla `proveedores` para hacer el JOIN correctamente
+    let pk = 'id';
+    try {
+      const [pkRows] = await db.promise().query("SHOW KEYS FROM proveedores WHERE Key_name = 'PRIMARY'");
+      if (pkRows && pkRows.length > 0 && pkRows[0].Column_name) {
+        pk = pkRows[0].Column_name;
+      } else {
+        // fallback: intentar leer columnas comunes
+        const [cols] = await db.promise().query('SHOW COLUMNS FROM proveedores');
+        const colNames = (cols || []).map(c => c.Field.toLowerCase());
+        if (colNames.includes('id')) pk = 'id';
+        else if (colNames.includes('id_proveedor')) pk = 'id_proveedor';
+        else if (colNames.includes('idproveedor')) pk = 'idproveedor';
+        else if (colNames.includes('id_prov')) pk = 'id_prov';
+      }
+    } catch (e) {
+      // no crítico
+    }
+
+    // Construir consulta usando la columna detectada
+    const joinCol = pk;
+    let orders;
+    try {
+      const query = `SELECT po.id, po.supplier_id, po.date, po.delivery_date, po.total, po.notes, po.created_at, p.${joinCol} AS supplier_key, p.nombre AS supplier_nombre\n       FROM purchase_orders po\n       LEFT JOIN proveedores p ON po.supplier_id = p.${joinCol}\n       ORDER BY po.created_at DESC`;
+      const [rows] = await db.promise().query(query);
+      orders = rows || [];
+    } catch (joinErr) {
+      // Si falla el JOIN por cualquier motivo, caer a una consulta simple y resolver nombres de proveedor por separado
+      console.warn('JOIN dinámico falló al obtener órdenes, intentando sin JOIN:', joinErr && joinErr.message);
+      const [rows] = await db.promise().query('SELECT id, supplier_id, date, delivery_date, total, notes, created_at FROM purchase_orders ORDER BY created_at DESC');
+      orders = rows || [];
+    }
+
+    const orderIds = (orders || []).map(o => o.id).filter(Boolean);
+    let items = [];
+    if (orderIds.length > 0) {
+      const [rowsItems] = await db.promise().query(
+        `SELECT id, order_id, product_name, quantity, unit_price FROM purchase_order_items WHERE order_id IN (${orderIds.map(() => '?').join(',')})`,
+        orderIds
+      );
+      items = rowsItems || [];
+    }
+
+    // Agrupar items por order_id
+    const itemsByOrder = {};
+    items.forEach(it => {
+      if (!itemsByOrder[it.order_id]) itemsByOrder[it.order_id] = [];
+      itemsByOrder[it.order_id].push({ id: it.id, product_name: it.product_name, quantity: it.quantity, unit_price: it.unit_price });
+    });
+
+    // Si la consulta original no devolvió supplier_nombre (por fallback), intentar mapear nombres consultando proveedores
+    const needSupplierLookup = orders.some(o => !o.supplier_nombre);
+    const supplierCache = {};
+    if (needSupplierLookup) {
+      for (const o of orders) {
+        const sid = o.supplier_id;
+        if (!sid) continue;
+        if (supplierCache[sid]) continue;
+        try {
+          const [provRows] = await db.promise().query(
+            'SELECT * FROM proveedores WHERE id = ? OR id_proveedor = ? OR idProveedor = ? OR ID = ? LIMIT 1',
+            [sid, sid, sid, sid]
+          );
+          supplierCache[sid] = (provRows && provRows[0]) ? (provRows[0].nombre || provRows[0].name || null) : null;
+        } catch (e) {
+          supplierCache[sid] = null;
+        }
+      }
+    }
+
+    const normalized = (orders || []).map(o => ({
+      id: o.id,
+      supplier_id: o.supplier_id,
+      supplier_nombre: o.supplier_nombre || supplierCache[o.supplier_id] || null,
+      date: o.date,
+      delivery_date: o.delivery_date,
+      total: Number(o.total || 0),
+      notes: o.notes || null,
+      created_at: o.created_at,
+      items: itemsByOrder[o.id] || []
+    }));
+
+    res.json({ success: true, orders: normalized });
+  } catch (err) {
+    console.error('Error obteniendo órdenes de compra:', err);
+    res.status(500).json({ success: false, message: 'Error al obtener órdenes de compra', error: err && (err.sqlMessage || err.message) });
+  }
+});
+
+// Obtener una orden de compra por id
+app.get('/ordenes_compra/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ success: false, message: 'ID requerido' });
+    const [rows] = await db.promise().query('SELECT * FROM purchase_orders WHERE id = ? LIMIT 1', [id]);
+    if (!rows || rows.length === 0) return res.status(404).json({ success: false, message: 'Orden no encontrada' });
+    const order = rows[0];
+    const [items] = await db.promise().query('SELECT id, order_id, product_name, quantity, unit_price FROM purchase_order_items WHERE order_id = ?', [id]);
+    // try to fetch supplier name if exists
+    let supplier_nombre = null;
+    try {
+      const [prov] = await db.promise().query('SELECT nombre FROM proveedores WHERE id = ? OR id_proveedor = ? LIMIT 1', [order.supplier_id, order.supplier_id]);
+      if (prov && prov[0]) supplier_nombre = prov[0].nombre || null;
+    } catch (e) { /* ignore */ }
+    const normalized = {
+      id: order.id,
+      supplier_id: order.supplier_id,
+      supplier_nombre,
+      date: order.date,
+      delivery_date: order.delivery_date,
+      total: Number(order.total || 0),
+      notes: order.notes || null,
+      created_at: order.created_at,
+      items: items || []
+    };
+    res.json({ success: true, order: normalized });
+  } catch (err) {
+    console.error('Error obteniendo orden:', err);
+    res.status(500).json({ success: false, message: 'Error obteniendo orden', error: err && (err.sqlMessage || err.message) });
+  }
+});
+
+// Actualizar una orden de compra (reemplaza items). También intenta ajustar stock en `libros` restando items previos y aplicando nuevos.
+app.put('/ordenes_compra/:id', async (req, res) => {
+  const id = req.params.id;
+  try {
+    if (!id) return res.status(400).json({ success: false, message: 'ID requerido' });
+    const { supplier_id, date, delivery_date, notes, products, total } = req.body;
+    // obtener items previos para revertir stock
+    const [prevItems] = await db.promise().query('SELECT product_name, quantity FROM purchase_order_items WHERE order_id = ?', [id]);
+    // revertir stock previo (reducir lo que se sumó al crear la orden)
+    try {
+      for (const it of (prevItems || [])) {
+        const name = (it.product_name || '').toString().trim();
+        const qty = Number(it.quantity || 0) || 0;
+        if (!name || qty <= 0) continue;
+        await db.promise().query('UPDATE libros SET stock = GREATEST(IFNULL(stock,0) - ?, 0) WHERE LOWER(title) = LOWER(?)', [qty, name]);
+      }
+    } catch (e) { console.warn('Warning: no se pudo revertir stock previo al actualizar orden', e && e.message); }
+
+    // actualizar cabecera de la orden
+    await db.promise().query('UPDATE purchase_orders SET supplier_id = ?, date = ?, delivery_date = ?, total = ?, notes = ? WHERE id = ?', [supplier_id || null, date || null, delivery_date || null, Number(total || 0), notes || null, id]);
+
+    // eliminar items previos y volver a insertar los nuevos
+    await db.promise().query('DELETE FROM purchase_order_items WHERE order_id = ?', [id]);
+    if (Array.isArray(products) && products.length > 0) {
+      const values = products.map(p => [id, p.name || p.product_name || '', Number(p.qty || p.quantity || 0), Number(p.price || p.unit_price || 0)]);
+      const placeholders = values.map(() => '(?, ?, ?, ?)').join(',');
+      const flat = values.reduce((a, b) => a.concat(b), []);
+      const insertItemsSql = `INSERT INTO purchase_order_items (order_id, product_name, quantity, unit_price) VALUES ${placeholders}`;
+      await db.promise().query(insertItemsSql, flat);
+      // aplicar nuevo stock (sumar cantidades) similar a creación
+      try {
+        for (const p of products) {
+          const name = (p.name || p.product_name || '').toString().trim();
+          const qty = Number(p.qty || p.quantity || 0) || 0;
+          const price = Number(p.price || p.unit_price || 0) || 0;
+          if (!name || qty <= 0) continue;
+          const [found] = await db.promise().query('SELECT id, IFNULL(stock,0) AS stock FROM libros WHERE LOWER(title) = LOWER(?) LIMIT 1', [name]);
+          if (found && found.length > 0) {
+            const existing = found[0];
+            const newStock = (Number(existing.stock || 0) + qty) || qty;
+            await db.promise().query('UPDATE libros SET stock = ?, price = ? WHERE id = ?', [newStock, price, existing.id]);
+          } else {
+            await db.promise().query('INSERT INTO libros (title, author, genre, price, image, description, stock) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, '', null, price, null, null, qty]);
+          }
+        }
+      } catch (syncErr) {
+        console.warn('No se pudo sincronizar items de orden con la tabla libros al actualizar:', syncErr && (syncErr.message || syncErr.sqlMessage || syncErr));
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error actualizando orden:', err);
+    res.status(500).json({ success: false, message: 'Error al actualizar orden', error: err && (err.sqlMessage || err.message) });
+  }
+});
+
+// Eliminar una orden de compra y sus items (intenta revertir stocks aplicados al crear la orden)
+app.delete('/ordenes_compra/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ success: false, message: 'ID requerido' });
+    // obtener items para revertir stock
+    const [items] = await db.promise().query('SELECT product_name, quantity FROM purchase_order_items WHERE order_id = ?', [id]);
+    try {
+      for (const it of (items || [])) {
+        const name = (it.product_name || '').toString().trim();
+        const qty = Number(it.quantity || 0) || 0;
+        if (!name || qty <= 0) continue;
+        await db.promise().query('UPDATE libros SET stock = GREATEST(IFNULL(stock,0) - ?, 0) WHERE LOWER(title) = LOWER(?)', [qty, name]);
+      }
+    } catch (e) { console.warn('Warning: no se pudo revertir stock al eliminar orden', e && e.message); }
+
+    await db.promise().query('DELETE FROM purchase_order_items WHERE order_id = ?', [id]);
+    const [del] = await db.promise().query('DELETE FROM purchase_orders WHERE id = ?', [id]);
+    if (del && del.affectedRows && del.affectedRows > 0) return res.json({ success: true });
+    return res.status(404).json({ success: false, message: 'Orden no encontrada' });
+  } catch (err) {
+    console.error('Error eliminando orden:', err);
+    res.status(500).json({ success: false, message: 'Error al eliminar orden', error: err && (err.sqlMessage || err.message) });
+  }
+});
+
 // Login
 app.post('/login', (req, res) => {
   const { correo, contrasena } = req.body;
@@ -185,6 +584,11 @@ app.post('/login', (req, res) => {
           console.log('Login: no se pudo leer avatar', e && e.message);
         }
 
+        // Si la cuenta está marcada como inactiva, informar al cliente
+        if (typeof usuario.activo !== 'undefined' && (usuario.activo === 0 || usuario.activo === false)) {
+          return res.json({ success: false, message: 'Cuenta inactiva', activo: false });
+        }
+
         res.json({ 
               success: true,
               message: 'Inicio de sesión exitoso',
@@ -193,7 +597,8 @@ app.post('/login', (req, res) => {
               rol: usuario.rol,
               celular: usuario.celular || null,
               direccion: usuario.direccion || null,
-              avatar: usuario.avatar || null
+              avatar: usuario.avatar || null,
+              activo: typeof usuario.activo === 'undefined' ? true : !!usuario.activo
         });
       } else {
         res.json({ success: false, message: 'Correo o contraseña incorrectos' });
@@ -234,6 +639,20 @@ db.promise().query("SHOW COLUMNS FROM usuario LIKE 'avatar'")
   .catch(err => {
     // Puede suceder si la tabla `usuario` no existe aún o hay permisos insuficientes
     console.warn('No se pudo verificar/crear la columna avatar en `usuario` (es posible que la tabla no exista aún):', err.message || err);
+  });
+
+// Asegurar columna `activo` en la tabla `usuario` para habilitar/deshabilitar cuentas
+db.promise().query("SHOW COLUMNS FROM usuario LIKE 'activo'")
+  .then(([rows]) => {
+    if (!rows || rows.length === 0) {
+      return db.promise().query("ALTER TABLE usuario ADD COLUMN activo TINYINT(1) DEFAULT 1")
+        .then(() => console.log('✅ Columna `activo` añadida a `usuario` (valor por defecto = 1)'))
+        .catch(err => console.error('Error al crear columna activo en usuario:', err));
+    }
+    return null;
+  })
+  .catch(err => {
+    console.warn('No se pudo verificar/crear la columna activo en `usuario`:', err && err.message || err);
   });
 
 // Actualizar perfil del usuario (actualizaciones parciales)
@@ -281,6 +700,64 @@ app.put('/perfil', async (req, res) => {
   }
 });
 
+// Endpoint para cambiar credenciales desde el área de administración/front-end
+// Verifica la sesión y la contraseña actual antes de aplicar el cambio.
+app.put('/admin/credenciales', async (req, res) => {
+  try {
+    const id_usuario = req.session.id_usuario;
+    if (!id_usuario) return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+
+    const { currentPassword, newPassword, newEmail } = req.body;
+    // Require at least one change
+    if (!newPassword && !newEmail) return res.status(400).json({ success: false, message: 'Falta nueva contraseña o nuevo email' });
+
+    // Obtener usuario actual
+    const [rows] = await db.promise().query('SELECT id_usuario, contrasena, correo FROM usuario WHERE id_usuario = ? LIMIT 1', [id_usuario]);
+    if (!rows || rows.length === 0) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    const user = rows[0];
+
+    // Si se solicita cambiar la contraseña, verificar la contraseña actual
+    if (newPassword) {
+      // Verificar contraseña actual (en este proyecto las contraseñas se almacenan en texto plano)
+      // Si usas hashing, reemplaza esta comparación por la verificación correspondiente.
+      if (!currentPassword || String(user.contrasena || '') !== String(currentPassword)) {
+        return res.status(400).json({ success: false, message: 'Contraseña actual incorrecta' });
+      }
+    }
+
+    // Preparar actualizaciones
+    const updates = [];
+    const values = [];
+    if (newPassword) {
+      updates.push('contrasena = ?');
+      values.push(newPassword);
+    }
+    if (newEmail) {
+      // validar formato básico
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRe.test(String(newEmail || '').trim())) {
+        return res.status(400).json({ success: false, message: 'Formato de email inválido' });
+      }
+      // comprobar unicidad
+      const [exists] = await db.promise().query('SELECT id_usuario FROM usuario WHERE correo = ? AND id_usuario != ? LIMIT 1', [newEmail, id_usuario]);
+      if (exists && exists.length > 0) return res.status(400).json({ success: false, message: 'El email ya está en uso' });
+      updates.push('correo = ?');
+      values.push(newEmail);
+    }
+
+    if (updates.length > 0) {
+      values.push(id_usuario);
+      const sql = `UPDATE usuario SET ${updates.join(', ')} WHERE id_usuario = ?`;
+      await db.promise().query(sql, values);
+    }
+
+    return res.json({ success: true, updated: true, message: 'Credenciales actualizadas correctamente' });
+  } catch (err) {
+    console.error('Error en /admin/credenciales:', err && (err.sqlMessage || err.message || err));
+    return res.status(500).json({ success: false, message: 'Error al actualizar credenciales' });
+  }
+});
+
 // Asegurar columna `stock` existe en la tabla `libros` para llevar inventario
 db.promise().query("ALTER TABLE libros ADD COLUMN stock INT DEFAULT 0")
   .then(() => console.log('✅ Columna `stock` añadida a `libros` (si no existía)'))
@@ -290,6 +767,78 @@ db.promise().query("ALTER TABLE libros ADD COLUMN stock INT DEFAULT 0")
       // console.warn('No se pudo crear la columna stock (posible que ya exista):', err.message || err);
     }
   });
+
+// Asegurar que la tabla `proveedores` exista (para gestión de proveedores)
+const createProveedoresTable = `
+CREATE TABLE IF NOT EXISTS proveedores (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(255),
+  empresa VARCHAR(255),
+  email VARCHAR(255),
+  telefono VARCHAR(50),
+  direccion TEXT,
+  productos TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+`;
+
+db.promise().query(createProveedoresTable)
+  .then(() => console.log('✅ Tabla `proveedores` verificada/creada'))
+  .catch(err => console.error('Error creando/verificando tabla proveedores:', err));
+
+// Asegurar columnas esperadas en `proveedores` (si la tabla venía de otro esquema)
+const alterProveedoresCols = [
+  "ALTER TABLE proveedores ADD COLUMN nombre VARCHAR(255)",
+  "ALTER TABLE proveedores ADD COLUMN empresa VARCHAR(255)",
+  "ALTER TABLE proveedores ADD COLUMN email VARCHAR(255)",
+  "ALTER TABLE proveedores ADD COLUMN telefono VARCHAR(50)",
+  "ALTER TABLE proveedores ADD COLUMN direccion TEXT",
+  "ALTER TABLE proveedores ADD COLUMN productos TEXT"
+];
+
+alterProveedoresCols.forEach(q => {
+  db.promise().query(q)
+    .then(() => {})
+    .catch(err => {
+      // Ignorar errores por columna ya existente o tabla ausente
+      if (err && (err.code === 'ER_DUP_FIELDNAME' || err.errno === 1060 || err.code === 'ER_NO_SUCH_TABLE' || err.errno === 1146)) {
+        return;
+      }
+      console.warn('Warning al asegurar columna proveedores:', err && (err.message || err.sqlMessage) || err);
+    });
+});
+
+// Asegurar tablas para órdenes de compra
+const createPurchaseOrdersTable = `
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  supplier_id INT,
+  date DATE,
+  delivery_date DATE,
+  total DECIMAL(12,2) DEFAULT 0,
+  notes TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+`;
+
+const createPurchaseItemsTable = `
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_id INT,
+  product_name VARCHAR(255),
+  quantity INT DEFAULT 0,
+  unit_price DECIMAL(12,2) DEFAULT 0,
+  FOREIGN KEY (order_id) REFERENCES purchase_orders(id) ON DELETE CASCADE
+)
+`;
+
+db.promise().query(createPurchaseOrdersTable)
+  .then(() => console.log('✅ Tabla `purchase_orders` verificada/creada'))
+  .catch(err => console.error('Error creando/verificando tabla purchase_orders:', err));
+
+db.promise().query(createPurchaseItemsTable)
+  .then(() => console.log('✅ Tabla `purchase_order_items` verificada/creada'))
+  .catch(err => console.error('Error creando/verificando tabla purchase_order_items:', err));
 
 
 // agregar al carrito
@@ -746,9 +1295,53 @@ app.post('/libros', async (req, res) => {
 app.delete('/libros/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const [result] = await db.promise().query('DELETE FROM libros WHERE id = ?', [id]);
-    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Libro no encontrado' });
-    res.json({ success: true });
+    // Usar transacción para eliminar libro y limpiar referencias en órdenes de compra
+    const conn = await db.promise().getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // obtener título del libro antes de borrar
+      const [[bookRow]] = await conn.query('SELECT title FROM libros WHERE id = ?', [id]);
+      if (!bookRow) {
+        await conn.rollback();
+        conn.release();
+        return res.status(404).json({ success: false, message: 'Libro no encontrado' });
+      }
+      const title = (bookRow.title || '').toString().trim();
+
+      // eliminar items de órdenes de compra que coincidan por nombre (case-insensitive)
+      const [deletedItemsResult] = await conn.query('DELETE poi FROM purchase_order_items poi WHERE LOWER(poi.product_name) = LOWER(?)', [title]);
+
+      // encontrar órdenes que ya no tengan items y eliminarlas
+      const [orderIdsRows] = await conn.query('SELECT po.id FROM purchase_orders po LEFT JOIN purchase_order_items poi ON poi.order_id = po.id WHERE poi.id IS NULL');
+      let deletedOrders = 0;
+      if (Array.isArray(orderIdsRows) && orderIdsRows.length > 0) {
+        const ids = orderIdsRows.map(r => r.id).filter(Boolean);
+        if (ids.length > 0) {
+          const placeholders = ids.map(() => '?').join(',');
+          const [delOrdersRes] = await conn.query(`DELETE FROM purchase_orders WHERE id IN (${placeholders})`, ids);
+          deletedOrders = delOrdersRes.affectedRows || 0;
+        }
+      }
+
+      // por último eliminar el libro
+      const [delBookRes] = await conn.query('DELETE FROM libros WHERE id = ?', [id]);
+      if (delBookRes.affectedRows === 0) {
+        // si por alguna razón no se eliminó, rollback
+        await conn.rollback();
+        conn.release();
+        return res.status(500).json({ success: false, message: 'No se pudo eliminar el libro' });
+      }
+
+      await conn.commit();
+      conn.release();
+      res.json({ success: true, deletedItems: (deletedItemsResult && deletedItemsResult.affectedRows) || 0, deletedOrders });
+    } catch (txErr) {
+      try { await conn.rollback(); } catch (_) { /* ignore */ }
+      conn.release();
+      console.error('Error en transacción al eliminar libro y limpiar órdenes:', txErr);
+      return res.status(500).json({ success: false, message: 'Error al eliminar libro y limpiar referencias' });
+    }
   } catch (err) {
     console.error('Error al eliminar libro destacado:', err);
     res.status(500).json({ success: false, message: 'Error al eliminar libro destacado' });
@@ -759,12 +1352,45 @@ app.delete('/libros/:id', async (req, res) => {
 app.put('/libros/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const { title, author, genre, price, image, description, stock } = req.body;
+    const allowed = ['title', 'author', 'genre', 'price', 'image', 'description', 'stock'];
+    const fields = [];
+    const values = [];
 
-    const [result] = await db.promise().query(
-      'UPDATE libros SET title = ?, author = ?, genre = ?, price = ?, image = ?, description = ?, stock = ? WHERE id = ?',
-      [title, author, genre || null, price || 0, image || null, description || null, (typeof stock === 'number' ? stock : (stock ? Number(stock) : null)), id]
-    );
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        // Normalize stock and price types
+        if (key === 'stock') {
+          const raw = req.body.stock;
+          const parsed = (typeof raw === 'number') ? raw : (raw ? Number(raw) : null);
+          fields.push('stock = ?');
+          values.push(parsed);
+        } else if (key === 'price') {
+          const raw = req.body.price;
+          const parsed = (typeof raw === 'number') ? raw : (raw ? Number(raw) : 0);
+          fields.push('price = ?');
+          values.push(parsed);
+        } else if (key === 'genre') {
+          const raw = req.body.genre;
+          fields.push('genre = ?');
+          values.push(raw || null);
+        } else if (key === 'image') {
+          fields.push('image = ?');
+          values.push(req.body.image || null);
+        } else if (key === 'description') {
+          fields.push('description = ?');
+          values.push(req.body.description || null);
+        } else {
+          fields.push(`${key} = ?`);
+          values.push(req.body[key]);
+        }
+      }
+    }
+
+    if (fields.length === 0) return res.status(400).json({ success: false, message: 'No hay campos para actualizar' });
+
+    const sql = `UPDATE libros SET ${fields.join(', ')} WHERE id = ?`;
+    values.push(id);
+    const [result] = await db.promise().query(sql, values);
 
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Libro no encontrado' });
     res.json({ success: true });
@@ -836,12 +1462,12 @@ app.get('/generos', async (req, res) => {
       // Usa LEFT JOIN con pedidos y GROUP BY para calcular pedidos_count.
       const [rows] = await db.promise().query(
         `SELECT u.id_usuario, u.nombre, u.correo, u.direccion, u.celular, u.rol,
-                u.fecha_creacion, COUNT(p.id_pedido) AS pedidos_count
+            u.fecha_creacion, u.activo, COUNT(p.id_pedido) AS pedidos_count
          FROM usuario u
          LEFT JOIN pedidos p ON p.id_usuario = u.id_usuario
          WHERE u.rol = 'cliente'
-         GROUP BY u.id_usuario, u.nombre, u.correo, u.direccion, u.celular, u.rol, u.fecha_creacion`
-      );
+         GROUP BY u.id_usuario, u.nombre, u.correo, u.direccion, u.celular, u.rol, u.fecha_creacion, u.activo`
+        );
 
       // Si la columna `fecha_creacion` no existe en la tabla `usuario`, su valor vendrá como null.
       res.json(rows);
@@ -894,6 +1520,31 @@ app.delete('/usuario/:id', async (req, res) => {
   }
 });
 
+// Actualizar estado activo/inactivo de un usuario
+app.patch('/usuario/:id', async (req, res) => {
+  const id = req.params.id;
+  const { activo, active, estado } = req.body || {};
+  // Determinar nuevo valor de activo (1 o 0)
+  let nuevo = null;
+  if (typeof activo !== 'undefined') nuevo = activo ? 1 : 0;
+  else if (typeof active !== 'undefined') nuevo = active ? 1 : 0;
+  else if (typeof estado !== 'undefined') {
+    const s = String(estado).toLowerCase();
+    nuevo = s.indexOf('inactiv') !== -1 ? 0 : 1;
+  }
+
+  if (nuevo === null) return res.status(400).json({ success: false, message: 'Payload inválido. Enviar { activo: true|false }' });
+
+  try {
+    const [r] = await db.promise().query('UPDATE usuario SET activo = ? WHERE id_usuario = ?', [nuevo, id]);
+    if (!r || r.affectedRows === 0) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    return res.json({ success: true, message: 'Estado de usuario actualizado', activo: !!nuevo });
+  } catch (err) {
+    console.error('Error actualizando campo activo usuario:', err);
+    return res.status(500).json({ success: false, message: 'Error actualizando estado del usuario' });
+  }
+});
+
 
   
 
@@ -913,6 +1564,147 @@ app.post('/logout', (req, res) => {
     res.clearCookie('connect.sid');
     res.json({ success: true, message: 'Sesión cerrada' });
   });
+});
+
+// Middleware de manejo de errores: capturar payloads demasiado grandes y devolver JSON
+// --- Tablas para inventario y compras/proveedores ---
+const createProveedores = `
+CREATE TABLE IF NOT EXISTS proveedores (
+  id_proveedor INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(255) UNIQUE,
+  contacto VARCHAR(255),
+  fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+`;
+
+const createCompras = `
+CREATE TABLE IF NOT EXISTS compras (
+  id_compra INT AUTO_INCREMENT PRIMARY KEY,
+  id_proveedor INT,
+  total DECIMAL(12,2) DEFAULT 0,
+  estado_pago VARCHAR(20) DEFAULT 'pendiente',
+  fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor) ON DELETE SET NULL
+)
+`;
+
+const createDetalleCompra = `
+CREATE TABLE IF NOT EXISTS detalle_compra (
+  id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+  id_compra INT,
+  id_libro INT NULL,
+  titulo VARCHAR(255),
+  cantidad INT DEFAULT 0,
+  precio_unitario DECIMAL(10,2) DEFAULT 0,
+  FOREIGN KEY (id_compra) REFERENCES compras(id_compra) ON DELETE CASCADE
+)
+`;
+
+db.promise().query(createProveedores).catch(err => console.error('Error creando proveedores:', err));
+db.promise().query(createCompras).catch(err => console.error('Error creando compras:', err));
+db.promise().query(createDetalleCompra).catch(err => console.error('Error creando detalle_compra:', err));
+
+// Rutas de inventario / compras
+app.get('/inventario/summary', async (req, res) => {
+  try {
+    const [[{ total_sales }]] = await db.promise().query('SELECT IFNULL(SUM(total),0) AS total_sales FROM pedidos');
+    const [[{ total_purchases }]] = await db.promise().query('SELECT IFNULL(SUM(total),0) AS total_purchases FROM compras');
+    const [[{ accounts_payable }]] = await db.promise().query("SELECT IFNULL(SUM(total),0) AS accounts_payable FROM compras WHERE estado_pago = 'pendiente'");
+
+    const profit = Number(total_sales || 0) - Number(total_purchases || 0);
+    res.json({ success: true, total_sales: Number(total_sales||0), total_purchases: Number(total_purchases||0), accounts_payable: Number(accounts_payable||0), profit });
+  } catch (err) {
+    console.error('Error en summary inventario:', err);
+    res.status(500).json({ success: false, message: 'Error obteniendo resumen' });
+  }
+});
+
+// Crear una compra
+app.post('/compras', async (req, res) => {
+  try {
+    const { proveedor, items, estado_pago } = req.body;
+    if (!proveedor || !Array.isArray(items) || items.length === 0) return res.status(400).json({ success: false, message: 'Payload inválido' });
+
+    // Buscar o crear proveedor
+    let [provRows] = await db.promise().query('SELECT id_proveedor FROM proveedores WHERE nombre = ?', [proveedor]);
+    let id_proveedor;
+    if (provRows.length > 0) {
+      id_proveedor = provRows[0].id_proveedor;
+    } else {
+      const [provRes] = await db.promise().query('INSERT INTO proveedores (nombre) VALUES (?)', [proveedor]);
+      id_proveedor = provRes.insertId;
+    }
+
+    // Calcular total
+    const total = items.reduce((s, it) => s + (Number(it.precio_unitario||0) * Number(it.cantidad||0)), 0);
+
+    const [compRes] = await db.promise().query('INSERT INTO compras (id_proveedor, total, estado_pago) VALUES (?, ?, ?)', [id_proveedor, total, estado_pago || 'pendiente']);
+    const id_compra = compRes.insertId;
+
+    // Insertar detalles y actualizar stock
+    for (const it of items) {
+      const titulo = (it.titulo || '').toString().substring(0,255);
+      const cantidad = Number(it.cantidad) || 0;
+      const precio_unitario = Number(it.precio_unitario) || 0;
+      await db.promise().query('INSERT INTO detalle_compra (id_compra, id_libro, titulo, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)', [id_compra, it.id_libro || null, titulo, cantidad, precio_unitario]);
+
+      // Intentar actualizar stock si id_libro es numérico
+      try {
+        const libroIdNum = Number.parseInt(it.id_libro, 10);
+        if (Number.isFinite(libroIdNum) && cantidad > 0) {
+          await db.promise().query('UPDATE libros SET stock = IFNULL(stock,0) + ? WHERE id = ?', [cantidad, libroIdNum]);
+        }
+      } catch (e) {
+        console.warn('No se pudo actualizar stock para item compra', e && e.message);
+      }
+    }
+
+    res.json({ success: true, id_compra });
+  } catch (err) {
+    console.error('Error creando compra:', err);
+    res.status(500).json({ success: false, message: 'Error creando compra' });
+  }
+});
+
+// Listar compras con items
+app.get('/compras', async (req, res) => {
+  try {
+    const [rows] = await db.promise().query('SELECT c.id_compra, c.id_proveedor, c.total, c.estado_pago, c.fecha, p.nombre AS proveedor FROM compras c LEFT JOIN proveedores p ON c.id_proveedor = p.id_proveedor ORDER BY c.fecha DESC');
+    const compras = [];
+    for (const c of rows) {
+      const [items] = await db.promise().query('SELECT id_detalle, id_compra, id_libro, titulo, cantidad, precio_unitario FROM detalle_compra WHERE id_compra = ?', [c.id_compra]);
+      compras.push({ ...c, items, proveedor: c.proveedor });
+    }
+    res.json({ success: true, compras });
+  } catch (err) {
+    console.error('Error listando compras:', err);
+    res.status(500).json({ success: false, message: 'Error listando compras' });
+  }
+});
+
+// Marcar compra como pagada
+app.post('/compras/:id/pagar', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [r] = await db.promise().query("UPDATE compras SET estado_pago = 'pagado' WHERE id_compra = ?", [id]);
+    if (r.affectedRows === 0) return res.status(404).json({ success: false, message: 'Compra no encontrada' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error al marcar pagada compra:', err);
+    res.status(500).json({ success: false, message: 'Error actualizando compra' });
+  }
+});
+
+// Listar ventas (pedidos) con detalle
+app.get('/ventas', async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(`SELECT p.id_pedido, p.id_usuario, p.total, p.estado, p.fecha_creacion, p.libros, u.nombre AS nombre_cliente FROM pedidos p LEFT JOIN usuario u ON p.id_usuario = u.id_usuario ORDER BY p.fecha_creacion DESC`);
+    const ventas = rows.map(p => ({ ...p, libros: typeof p.libros === 'string' ? JSON.parse(p.libros) : p.libros }));
+    res.json({ success: true, ventas });
+  } catch (err) {
+    console.error('Error listando ventas:', err);
+    res.status(500).json({ success: false, message: 'Error listando ventas' });
+  }
 });
 
 // Middleware de manejo de errores: capturar payloads demasiado grandes y devolver JSON

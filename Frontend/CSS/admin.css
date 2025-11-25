@@ -206,7 +206,7 @@ body {
 .section-actions #orderEndDate:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 6px 18px rgba(102,126,234,0.08);
+  box-shadow: 0 6px 18px rgba(102, 126, 234, 0.08);
 }
 
 .section-actions #orderStartDate,
@@ -223,7 +223,7 @@ body {
   border: none;
   cursor: pointer;
   font-weight: 700;
-  box-shadow: 0 8px 20px rgba(80,88,200,0.12);
+  box-shadow: 0 8px 20px rgba(80, 88, 200, 0.12);
 }
 
 .section-actions #applyOrderFilter:hover {
@@ -231,7 +231,8 @@ body {
 }
 
 /* Hide date inputs by default (JS toggles display) but keep them accessible for layout */
-#orderStartDate[style*="display:none"], #orderEndDate[style*="display:none"] {
+#orderStartDate[style*="display:none"],
+#orderEndDate[style*="display:none"] {
   display: none !important;
 }
 
@@ -360,8 +361,8 @@ body {
 .bar-wrap .bar {
   min-height: 6px;
   background: linear-gradient(180deg, #6b46c1, #4c1d95);
-  box-shadow: 0 4px 10px rgba(76,29,149,0.15);
-  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 4px 10px rgba(76, 29, 149, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .bar-wrap .bar::before {
@@ -973,4 +974,96 @@ input[type="number"]:focus {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(102, 126, 234, 0.7);
+}
+
+/* Estilos para tabs de inventario */
+.inventory-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.inventory-tab {
+  flex: 1;
+  min-width: 150px;
+  padding: 1rem 1.5rem;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #666;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.inventory-tab:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.inventory-tab.active {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+.inventory-tab i {
+  font-size: 1.2rem;
+}
+
+.inventory-tab-content {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.inventory-tab-content.active {
+  display: block;
+}
+
+/* Estilos para gestión de proveedores */
+.suppliers-header,
+.purchase-orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+}
+
+/* Suppliers table / light text */
+.suppliers-list {
+  color: #666; /* texto más claro en la sección de proveedores */
+}
+.suppliers-list .admin-table th,
+.suppliers-list .admin-table td {
+  color: #666;
+  vertical-align: middle;
+}
+.suppliers-list .admin-table th {
+  background: linear-gradient(135deg, #9aa9f3, #b89be8); /* slightly lighter header */
+}
+.suppliers-list .admin-table td button {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+/* Validation error messages below inputs */
+.input-error {
+  color: #dc3545;
+  font-size: 0.9rem;
+  margin-top: 6px;
+  min-height: 1.1em;
 }
