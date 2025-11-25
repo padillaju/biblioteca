@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS libros (
   id INT AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   author VARCHAR(255),
+  genre VARCHAR(255),
   price DECIMAL(10,2) DEFAULT 0,
   image MEDIUMTEXT,
   description TEXT,
@@ -105,6 +106,18 @@ db.promise().query("ALTER TABLE libros MODIFY COLUMN image MEDIUMTEXT")
     // Ignorar errores comunes (por ejemplo si la tabla no existe aún o la columna ya tiene el tipo correcto)
     if (err && err.code !== 'ER_NO_SUCH_TABLE' && err.errno !== 1146) {
       console.error('Error al alterar la columna image en libros:', err);
+    }
+  });
+
+// Asegurar columna `genre` existe en la tabla `libros`
+db.promise().query("ALTER TABLE libros ADD COLUMN genre VARCHAR(255) NULL")
+  .then(() => console.log('✅ Columna `genre` añadida a `libros`'))
+  .catch(err => {
+    // Ignorar error si ya existe u otros errores no críticos
+    if (err && err.code !== 'ER_DUP_FIELDNAME' && err.errno !== 1060) {
+      // ER_DUP_FIELDNAME / errno 1060 means column exists in some MySQL versions
+      // Ignore otherwise log
+      // console.warn('No se pudo crear la columna genre (posible que ya exista):', err.message || err);
     }
   });
 
@@ -267,6 +280,16 @@ app.put('/perfil', async (req, res) => {
     res.status(500).json({ success: false, message: 'Error al actualizar perfil', error: err.sqlMessage || err.message });
   }
 });
+
+// Asegurar columna `stock` existe en la tabla `libros` para llevar inventario
+db.promise().query("ALTER TABLE libros ADD COLUMN stock INT DEFAULT 0")
+  .then(() => console.log('✅ Columna `stock` añadida a `libros` (si no existía)'))
+  .catch(err => {
+    // Ignorar si ya existe u otros errores no críticos
+    if (err && err.code !== 'ER_DUP_FIELDNAME' && err.errno !== 1060) {
+      // console.warn('No se pudo crear la columna stock (posible que ya exista):', err.message || err);
+    }
+  });
 
 
 // agregar al carrito
@@ -472,6 +495,91 @@ app.post("/pedidos", async (req, res) => {
         "INSERT INTO detalle_pedido (id_pedido, id_libro, titulo, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)",
         [pedidoId, item.libro_id_api, item.titulo, item.cantidad, item.precio_unitario]
       );
+
+      // Intentar decrementar stock en la tabla `libros` si el id corresponde a un libro local
+      try {
+        const libroIdNum = Number.parseInt(item.libro_id_api, 10);
+        const reqQty = Number(item.cantidad) || 0;
+        if (Number.isFinite(libroIdNum) && reqQty > 0) {
+          // Primero, obtener el libro por id (lock row)
+          const [mainRows] = await connection.query('SELECT id, title, author, IFNULL(stock,0) AS stock FROM libros WHERE id = ? FOR UPDATE', [libroIdNum]);
+          let remaining = reqQty;
+
+          // helper to decrement from a specific row
+          const decrementFromRow = async (rowId, take) => {
+            if (!take || take <= 0) return 0;
+            await connection.query('UPDATE libros SET stock = GREATEST(IFNULL(stock,0) - ?, 0) WHERE id = ?', [take, rowId]);
+            return take;
+          };
+
+          if (mainRows && mainRows.length > 0) {
+            const main = mainRows[0];
+            const used = Math.min(Number(main.stock || 0), remaining);
+            if (used > 0) {
+              await decrementFromRow(main.id, used);
+              remaining -= used;
+            }
+
+            // If still remaining, find other rows with same title+author and consume from them
+            if (remaining > 0) {
+              const title = (main.title || '').toString().trim().toLowerCase();
+              const author = (main.author || '').toString().trim().toLowerCase();
+              const [matches] = await connection.query(
+                'SELECT id, IFNULL(stock,0) AS stock FROM libros WHERE LOWER(title) = ? AND LOWER(IFNULL(author,\'\')) = ? AND id != ? FOR UPDATE',
+                [title, author, main.id]
+              );
+
+              // compute total available
+              const totalAvailable = (matches || []).reduce((s, r) => s + Number(r.stock || 0), 0);
+              if (totalAvailable < remaining) {
+                // not enough across duplicates — rollback and error
+                await connection.rollback();
+                connection.release();
+                return res.status(400).json({ success: false, message: `Stock insuficiente para '${item.titulo || item.title || 'libro'}'` });
+              }
+
+              for (const r of matches) {
+                if (remaining <= 0) break;
+                const take = Math.min(Number(r.stock || 0), remaining);
+                if (take > 0) {
+                  await decrementFromRow(r.id, take);
+                  remaining -= take;
+                }
+              }
+            }
+          } else {
+            // If the main id was not found, try to find rows by title+author from the item payload
+            const title = (item.titulo || item.title || '').toString().trim().toLowerCase();
+            const author = (item.autor || item.author || '').toString().trim().toLowerCase();
+            const [matches] = await connection.query(
+              'SELECT id, IFNULL(stock,0) AS stock FROM libros WHERE LOWER(title) = ? AND LOWER(IFNULL(author,\'\')) = ? FOR UPDATE',
+              [title, author]
+            );
+
+            const totalAvailable = (matches || []).reduce((s, r) => s + Number(r.stock || 0), 0);
+            if (totalAvailable < remaining) {
+              await connection.rollback();
+              connection.release();
+              return res.status(400).json({ success: false, message: `Stock insuficiente para '${item.titulo || item.title || 'libro'}'` });
+            }
+
+            for (const r of matches) {
+              if (remaining <= 0) break;
+              const take = Math.min(Number(r.stock || 0), remaining);
+              if (take > 0) {
+                await decrementFromRow(r.id, take);
+                remaining -= take;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('No se pudo decrementar stock para item:', item, e && e.message);
+        // on unexpected error, rollback and return
+        try { await connection.rollback(); } catch (er) { /* ignore */ }
+        try { connection.release(); } catch (er) { /* ignore */ }
+        return res.status(500).json({ success: false, message: 'Error al actualizar stock', error: e && e.message });
+      }
     }
 
     await connection.commit();
@@ -557,7 +665,27 @@ app.get('/pedidos', async (req, res) => {
 // Obtener libros destacados
 app.get('/libros', async (req, res) => {
   try {
-    const [rows] = await db.promise().query('SELECT id, title, author, price, image, description FROM libros ORDER BY created_at DESC');
+    const search = (req.query.search || '').toString().trim();
+    const genre = (req.query.genre || '').toString().trim().toLowerCase();
+
+    // Construir cláusulas WHERE dinámicas
+    const where = [];
+    const params = [];
+
+    if (search) {
+      where.push('(LOWER(title) LIKE ? OR LOWER(author) LIKE ?)');
+      const like = `%${search.toLowerCase()}%`;
+      params.push(like, like);
+    }
+
+    if (genre) {
+      where.push('LOWER(genre) = ?');
+      params.push(genre.toLowerCase());
+    }
+
+    const baseSelect = 'SELECT id, title, author, genre, price, image, description, stock FROM libros';
+    const sql = where.length > 0 ? `${baseSelect} WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT 100` : `${baseSelect} ORDER BY created_at DESC`;
+    const [rows] = await db.promise().query(sql, params);
     res.json({ success: true, books: rows });
   } catch (err) {
     console.error('Error al obtener libros destacados:', err);
@@ -565,11 +693,31 @@ app.get('/libros', async (req, res) => {
   }
 });
 
+// Obtener libros con indicador si fueron comprados (purchased)
+app.get('/libros/status', async (req, res) => {
+  try {
+    // Para cada libro comprobar si existe al menos un detalle_pedido asociado
+    const sql = `
+      SELECT l.id, l.title, l.author, l.genre, l.price, l.image, l.description, IFNULL(l.stock,0) AS stock,
+             EXISTS(SELECT 1 FROM detalle_pedido dp WHERE dp.id_libro = l.id) AS purchased
+      FROM libros l
+      ORDER BY l.created_at DESC
+    `;
+    const [rows] = await db.promise().query(sql);
+    // Convertir flag numérico a boolean en JS
+    const books = (rows || []).map(r => ({ ...r, purchased: Boolean(r.purchased) }));
+    res.json({ success: true, books });
+  } catch (err) {
+    console.error('Error al obtener libros con estado:', err);
+    res.status(500).json({ success: false, message: 'Error al obtener libros con estado' });
+  }
+});
+
 // Obtener un libro por id
 app.get('/libros/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const [rows] = await db.promise().query('SELECT id, title, author, price, image, description FROM libros WHERE id = ?', [id]);
+    const [rows] = await db.promise().query('SELECT id, title, author, genre, price, image, description, stock FROM libros WHERE id = ?', [id]);
     if (rows.length === 0) return res.status(404).json({ success: false, message: 'Libro no encontrado' });
     res.json({ success: true, book: rows[0] });
   } catch (err) {
@@ -581,10 +729,10 @@ app.get('/libros/:id', async (req, res) => {
 // Agregar libro destacado
 app.post('/libros', async (req, res) => {
   try {
-    const { title, author, price, image, description } = req.body;
+    const { title, author, genre, price, image, description, stock } = req.body;
     const [result] = await db.promise().query(
-      'INSERT INTO libros (title, author, price, image, description) VALUES (?, ?, ?, ?, ?)',
-      [title, author, price || 0, image || null, description || null]
+      'INSERT INTO libros (title, author, genre, price, image, description, stock) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [title, author, genre || null, price || 0, image || null, description || null, (typeof stock === 'number' ? stock : (stock ? Number(stock) : 0))]
     );
 
     res.json({ success: true, id: result.insertId });
@@ -611,11 +759,11 @@ app.delete('/libros/:id', async (req, res) => {
 app.put('/libros/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const { title, author, price, image, description } = req.body;
+    const { title, author, genre, price, image, description, stock } = req.body;
 
     const [result] = await db.promise().query(
-      'UPDATE libros SET title = ?, author = ?, price = ?, image = ?, description = ? WHERE id = ?',
-      [title, author, price || 0, image || null, description || null, id]
+      'UPDATE libros SET title = ?, author = ?, genre = ?, price = ?, image = ?, description = ?, stock = ? WHERE id = ?',
+      [title, author, genre || null, price || 0, image || null, description || null, (typeof stock === 'number' ? stock : (stock ? Number(stock) : null)), id]
     );
 
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Libro no encontrado' });
@@ -667,6 +815,19 @@ app.get("/mis-pedidos", async (req, res) => {
 
 
 // ====RUTAS DE ADMINISTRADOR====
+
+// Obtener lista de géneros disponibles
+app.get('/generos', async (req, res) => {
+  try {
+    const [rows] = await db.promise().query("SELECT DISTINCT genre FROM libros WHERE genre IS NOT NULL AND genre != '' ORDER BY genre ASC");
+    const genres = (rows || []).map(r => r.genre).filter(Boolean);
+    res.json({ success: true, genres });
+  } catch (err) {
+    console.error('Error al obtener géneros:', err);
+    res.status(500).json({ success: false, message: 'Error al obtener géneros' });
+  }
+});
+
 
 // Obtener solo clientes
   app.get("/cliente", async (req, res) => {

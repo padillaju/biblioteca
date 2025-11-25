@@ -1,4 +1,44 @@
 console.log('admin.js loaded');
+// Global helper: parse a number-like string into a float (handles commas, dots and currency symbols)
+function parseNumberString(input) {
+  if (input == null) return 0;
+  let s = String(input).trim();
+  if (!s) return 0;
+  s = s.replace(/[^0-9,.-]/g, '');
+  const hasDot = s.indexOf('.') !== -1;
+  const hasComma = s.indexOf(',') !== -1;
+
+  if (hasDot && hasComma) {
+    if (s.lastIndexOf('.') > s.lastIndexOf(',')) {
+      s = s.replace(/,/g, '');
+      return parseFloat(s) || 0;
+    } else {
+      s = s.replace(/\./g, '').replace(',', '.');
+      return parseFloat(s) || 0;
+    }
+  }
+
+  if (hasComma) {
+    const parts = s.split(',');
+    if (parts[1] && parts[1].length === 3) {
+      s = s.replace(/,/g, '');
+      return parseFloat(s) || 0;
+    }
+    s = s.replace(',', '.');
+    return parseFloat(s) || 0;
+  }
+
+  if (hasDot) {
+    const parts = s.split('.');
+    if (parts[1] && parts[1].length === 3) {
+      s = s.replace(/\./g, '');
+      return parseFloat(s) || 0;
+    }
+    return parseFloat(s) || 0;
+  }
+
+  return parseFloat(s) || 0;
+}
 // Lightweight toast implementation for admin pages
 function showToast(message, type = 'success', duration = 3500) {
   try {
@@ -21,11 +61,15 @@ function showToast(message, type = 'success', duration = 3500) {
       document.body.appendChild(container);
     }
 
+    // map semantic types to colors/backgrounds
+    const _colors = { success: '#28a745', error: '#dc3545', warning: '#ffb020', info: '#17a2b8' };
+    const _bg = { success: '#f6ffef', error: '#fff5f5', warning: '#fff9eb', info: '#f0f9ff' };
+    const color = _colors[type] || '#6B00FF';
+    const bg = _bg[type] || '#ffffff';
+
     const toast = document.createElement('div');
-    toast.className = 'toast-item';
-    const color = (type === 'success') ? '#2ecc71' : (type === 'error') ? '#e74c3c' : (type === 'warning') ? '#f39c12' : '#3498db';
     Object.assign(toast.style, {
-      background: '#fff',
+      background: bg,
       color: '#111',
       borderRadius: '8px',
       boxShadow: '0 8px 22px rgba(0,0,0,0.12)',
@@ -65,7 +109,8 @@ function showToast(message, type = 'success', duration = 3500) {
 
     return { remove };
   } catch (err) {
-    try { alert(message); } catch (e) { /* ignore */ }
+    // If something goes wrong constructing toasts, avoid native alert popups
+    try { console.warn('showToast fallback:', message); } catch (e) { /* ignore */ }
   }
 }
 // Asegurar que `confirmWithToast` exista en el ámbito global para evitar ReferenceError
@@ -156,6 +201,48 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch (e) {
     console.warn('No sales chart available or error initializing it', e);
   }
+
+// Helper reusable: parse a number-like string into a float (handles commas, dots and currency symbols)
+function parseNumberString(input) {
+  if (input == null) return 0;
+  let s = String(input).trim();
+  if (!s) return 0;
+  s = s.replace(/[^0-9,.-]/g, '');
+  const hasDot = s.indexOf('.') !== -1;
+  const hasComma = s.indexOf(',') !== -1;
+
+  if (hasDot && hasComma) {
+    if (s.lastIndexOf('.') > s.lastIndexOf(',')) {
+      s = s.replace(/,/g, '');
+      return parseFloat(s) || 0;
+    } else {
+      s = s.replace(/\./g, '').replace(',', '.');
+      return parseFloat(s) || 0;
+    }
+  }
+
+  if (hasComma) {
+    const parts = s.split(',');
+    if (parts[1] && parts[1].length === 3) {
+      s = s.replace(/,/g, '');
+      return parseFloat(s) || 0;
+    }
+    s = s.replace(',', '.');
+    return parseFloat(s) || 0;
+  }
+
+  if (hasDot) {
+    const parts = s.split('.');
+    if (parts[1] && parts[1].length === 3) {
+      s = s.replace(/\./g, '');
+      return parseFloat(s) || 0;
+    }
+    return parseFloat(s) || 0;
+  }
+
+  return parseFloat(s) || 0;
+}
+
 
 // Confirmación no bloqueante local para admin (usa su propio DOM, independiente de showToast)
 function confirmWithToast(message, onConfirm, onCancel) {
@@ -279,7 +366,7 @@ async function renderSalesChart(period = 'month', openModal = false) {
       const lbl = node.dataset.label;
       const amount = Number(node.dataset.amount || 0);
       const msg = `${lbl} — $${amount.toFixed(2)}`;
-      try { showToast(msg, 'info') } catch (e) { alert(msg) }
+      try { showToast(msg, 'info') } catch (e) { console.warn(msg) }
     });
   });
 
@@ -336,7 +423,7 @@ function renderSalesChartFromArray(pedidosArray, period = 'month') {
       const lbl = node.dataset.label;
       const amount = Number(node.dataset.amount || 0);
       const msg = `${lbl} — $${amount.toFixed(2)}`;
-      try { showToast(msg, 'info') } catch (e) { alert(msg) }
+      try { showToast(msg, 'info') } catch (e) { console.warn(msg) }
     });
   });
 }
@@ -544,7 +631,7 @@ async function applyOrderDateFilter() {
     if (startEl && startEl.value) start = new Date(startEl.value);
     if (endEl && endEl.value) end = new Date(endEl.value);
     if (start && end && start > end) {
-      try { showToast('La fecha de inicio no puede ser posterior a la fecha final.', 'warning') } catch (e) { alert('La fecha de inicio no puede ser posterior a la fecha final.') }
+      try { showToast('La fecha de inicio no puede ser posterior a la fecha final.', 'warning') } catch (e) { console.warn('La fecha de inicio no puede ser posterior a la fecha final.') }
       return;
     }
   } else if (mode === 'today') {
@@ -739,7 +826,7 @@ async function deleteUser(id) {
     const data = await res.json().catch(() => ({}));
     if (!data || !data.success) {
       const msg = (data && data.message) ? data.message : 'No se pudo eliminar el usuario';
-      try { showToast(msg, 'error') } catch (e) { alert(msg) }
+      try { showToast(msg, 'error') } catch (e) { console.warn(msg) }
       console.error('Respuesta eliminar usuario:', data);
       return;
     }
@@ -748,9 +835,9 @@ async function deleteUser(id) {
     // actualizar contadores generales (opcional)
     const ordersCount = document.getElementById('totalOrders').textContent;
     // nada más por ahora
-  } catch (err) {
+    } catch (err) {
     console.error('Error eliminando usuario:', err);
-    try { showToast('Error eliminando usuario', 'error') } catch (e) { alert('Error eliminando usuario') }
+    try { showToast('Error eliminando usuario', 'error') } catch (e) { console.warn('Error eliminando usuario') }
   }
 }
 
@@ -826,7 +913,6 @@ async function showOrderDetails(orderOrId) {
     <p><strong>ID Pedido:</strong> ${order.id_pedido || order.id || ''}</p>
     <p><strong>Cliente:</strong> ${escapeHtml(order.nombre_cliente || order.cliente || 'ID ' + (order.id_usuario || ''))}</p>
     <p><strong>Email:</strong> ${escapeHtml(order.correo_cliente || order.email || '')}</p>
-    <p><strong>Estado:</strong> ${escapeHtml(order.estado || order.status || '')}</p>
     <p><strong>Total:</strong> $${Number(order.total || order.total_pedido || order.amount || 0).toFixed(2)}</p>
     <hr>
   `;
@@ -1033,7 +1119,11 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const title = document.getElementById('bookTitle').value.trim();
     const author = document.getElementById('bookAuthor').value.trim();
+    const genre = (document.getElementById('bookGenre') && document.getElementById('bookGenre').value.trim()) || null;
     const price = parsePriceString(document.getElementById('bookPrice').value);
+    // `stock` and `isbn` removed from UI — backend may handle them separately
+    const stock = undefined;
+    const isbn = null;
     const image = document.getElementById('bookImage').value.trim() || null;
     const description = document.getElementById('bookDescription').value.trim() || null;
     const bookIdField = document.getElementById('bookId');
@@ -1045,18 +1135,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch(`/libros/${bookId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, author, price, image, description })
+          body: JSON.stringify({ title, author, isbn, genre, price, image, description, stock })
         });
 
         const data = await res.json();
         if (res.ok && data && data.success) {
-          try { showToast('Libro actualizado correctamente', 'success') } catch (e) { alert('Libro actualizado correctamente') }
+          showToast('Libro actualizado correctamente', 'success');
           closeAddBookModal();
           await loadFeaturedBooks();
           return;
         } else {
           console.error('Error al actualizar libro:', data);
-          try { showToast('No se pudo actualizar el libro en el servidor', 'warning') } catch (e) { alert('No se pudo actualizar el libro en el servidor') }
+          showToast('No se pudo actualizar el libro en el servidor', 'warning');
           return;
         }
       }
@@ -1065,21 +1155,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/libros', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, author, price, image, description })
+        body: JSON.stringify({ title, author, isbn, genre, price, image, description, stock })
       });
 
       const data = await res.json();
       if (res.ok && data && data.success) {
-        try { showToast('Libro agregado correctamente', 'success') } catch (e) { alert('Libro agregado correctamente') }
+        showToast('Libro agregado correctamente', 'success');
         closeAddBookModal();
         await loadFeaturedBooks();
       } else {
         console.error('Error al agregar libro:', data);
-        try { showToast('No se pudo agregar el libro en el servidor', 'warning') } catch (e) { alert('No se pudo agregar el libro en el servidor') }
+        showToast('No se pudo agregar el libro en el servidor', 'warning');
       }
     } catch (err) {
       console.error('Error enviando libro al servidor:', err);
-      try { showToast('Error de red al agregar/actualizar libro', 'error') } catch (e) { alert('Error de red al agregar/actualizar libro') }
+      try { showToast('Error de red al agregar/actualizar libro', 'error') } catch (e) { console.warn('Error de red al agregar/actualizar libro') }
     }
   });
 });
@@ -1089,25 +1179,57 @@ async function loadFeaturedBooks() {
   const container = document.getElementById('featuredBooks');
   if (!container) return;
   try {
-    const res = await fetch('/libros');
-    const data = await res.json();
+    // Ahora se muestra una tabla administrativa: cada fila representa un libro (ISBN único)
+    const res = await fetch('/libros/status');
+    const data = await res.json().catch(() => ({}));
     const books = (data && data.success && Array.isArray(data.books)) ? data.books : [];
 
-    container.innerHTML = books.map(b => `
-      <div class="book-card">
-        <img src="${b.image || '/abstract-book-cover.png'}" alt="${escapeHtml(b.title || '')}" class="book-image">
-        <div class="book-info">
-          <h4>${escapeHtml(b.title || '')}</h4>
-          <p><strong>Autor:</strong> ${escapeHtml(b.author || '')}</p>
-          <p>${escapeHtml((b.description || '').substring(0,200))}</p>
-          <div class="book-price">$${Number(b.price || 0).toLocaleString()}</div>
-          <div class="book-actions">
+    // Actualizar contador de libros totales
+    try {
+      const totalEl = document.getElementById('totalBooks');
+      if (totalEl) totalEl.textContent = String(books.length);
+      const booksCountEl = document.getElementById('booksCount');
+      if (booksCountEl) booksCountEl.textContent = `(${books.length})`;
+    } catch (e) { /* ignore */ }
+
+    // Construir tabla (incluye columna Imagen y Precio)
+    const rowsHtml = (books || []).map(b => {
+      const imgSrc = b.image || '/abstract-book-cover.png';
+      const priceText = `$${Number(b.price || 0).toFixed(2)}`;
+      return `
+        <tr>
+          <td>${b.id}</td>
+          <td><img src="${imgSrc}" alt="${escapeHtml(b.title||'portada')}" class="book-thumb"> ${escapeHtml(b.title || '')}</td>
+          <td>${escapeHtml(b.author || '')}</td>
+          <td>${priceText}</td>
+          <td>${b.purchased ? '<span style="color:green;font-weight:600">Sí</span>' : '<span style="color:#666">No</span>'}</td>
+          <td>
             <button class="btn-secondary" onclick="openEditBookModal(${b.id})">Editar</button>
             <button class="btn-danger" onclick="deleteFeaturedBook(${b.id})">Eliminar</button>
-          </div>
-        </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="table-container">
+        <table class="admin-table admin-books-table" style="width:100%;">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Título</th>
+              <th>Autor</th>
+              <th>Precio</th>
+              <th>Comprado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
       </div>
-    `).join('');
+    `;
   } catch (err) {
     console.error('Error cargando libros destacados:', err);
     container.innerHTML = '<p>No se pudieron cargar libros destacados.</p>';
@@ -1266,14 +1388,14 @@ async function openEditBookModal(id) {
     if (!res.ok) {
       const err = await res.json().catch(()=>null);
       console.error('Error obteniendo libro para editar:', err || res.status);
-      try { showToast('No se pudo cargar la información del libro', 'error') } catch (e) { alert('No se pudo cargar la información del libro') }
+      try { showToast('No se pudo cargar la información del libro', 'error') } catch (e) { console.warn('No se pudo cargar la información del libro') }
       return;
     }
 
     const data = await res.json();
     if (!data || !data.success) {
       console.error('Respuesta inválida al obtener libro:', data);
-      try { showToast('No se pudo cargar la información del libro', 'error') } catch (e) { alert('No se pudo cargar la información del libro') }
+      try { showToast('No se pudo cargar la información del libro', 'error') } catch (e) { console.warn('No se pudo cargar la información del libro') }
       return;
     }
 
@@ -1284,12 +1406,14 @@ async function openEditBookModal(id) {
     document.getElementById('bookPrice').value = book.price || 0;
     document.getElementById('bookImage').value = book.image || '';
     document.getElementById('bookDescription').value = book.description || '';
+    // `stock` and `isbn` are managed server-side — no UI inputs to prefill
+    const gEl = document.getElementById('bookGenre'); if (gEl) gEl.value = book.genre || '';
 
     const modal = document.getElementById('addBookModal');
     if (modal) modal.classList.add('active');
-  } catch (err) {
+    } catch (err) {
     console.error('Error en openEditBookModal:', err);
-    try { showToast('Error cargando datos del libro', 'error') } catch (e) { alert('Error cargando datos del libro') }
+    try { showToast('Error cargando datos del libro', 'error') } catch (e) { console.warn('Error cargando datos del libro') }
   }
 }
 
@@ -1303,15 +1427,15 @@ async function deleteFeaturedBook(id) {
       const res = await fetch(`/libros/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (res.ok && data && data.success) {
-        try { showToast('Libro eliminado', 'success') } catch (e) { alert('Libro eliminado') }
+          showToast('Libro eliminado', 'success');
         await loadFeaturedBooks();
       } else {
         console.error('Error eliminando libro:', data);
-        try { showToast('No se pudo eliminar el libro', 'error') } catch (e) { alert('No se pudo eliminar el libro') }
+          showToast('No se pudo eliminar el libro', 'error');
       }
     } catch (err) {
       console.error('Error en deleteFeaturedBook:', err);
-      try { showToast('Error de red', 'error') } catch (e) { alert('Error de red') }
+        showToast('Error de red', 'error');
     }
   }, () => {
     try { showToast('Eliminación cancelada', 'info') } catch (e) { /* ignore */ }

@@ -48,7 +48,7 @@
                 </li>
                 <li class="nav-item" data-section="books">
                     <i class="fas fa-book"></i>
-                    <span>Libros Destacados</span>
+                    <span>Libros </span>
                 </li>
                 <li class="nav-item" data-section="reports">
                     <i class="fas fa-chart-bar"></i>
@@ -92,6 +92,15 @@
                     <div class="stat-info">
                         <h3 id="totalRevenue">$0</h3>
                         <p>Ingresos Totales</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                       <i class="fas fa-book-open"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalBooks">0</h3>
+                        <p>Cantidad de libros</p>
                     </div>
                 </div>
                
@@ -194,7 +203,7 @@
 
         <section id="books" class="admin-section">
             <div class="section-header">
-                <h2>Libros Destacados</h2>
+                <h2>Libros <span id="booksCount" style="font-size:0.9rem; color:#666; margin-left:8px;"></span></h2>
                 <div class="section-actions">
                     <button class="btn-primary" onclick="openAddBookModal()">
                         <i class="fas fa-plus"></i>
@@ -295,7 +304,7 @@
     <div id="addBookModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Agregar Libro Destacado</h3>
+                <h3>Agregar Libro </h3>
                 <span class="close" onclick="closeAddBookModal()">&times;</span>
             </div>
             <form id="addBookForm">
@@ -312,9 +321,23 @@
                     <label>Precio</label>
                     <input type="text" id="bookPrice" required>
                 </div>
+                <!-- La cantidad e ISBN ya no son necesarios en el formulario de registro -->
                 <div class="form-group">
                     <label>URL de la Imagen</label>
                     <input type="url" id="bookImage">
+                </div>
+                <div class="form-group">
+                    <label>Género</label>
+                    <select id="bookGenre" class="form-control">
+                        <option value="">Seleccione un género</option>
+                        <option value="Ciencia ficción">Ciencia ficción</option>
+                        <option value="Romance">Romance</option>
+                        <option value="Terror">Terror</option>
+                        <option value="Fantasia">Fantasía</option>
+                        <option value="Misterio">Misterio</option>
+                        <option value="Aventura">Aventura</option>
+                        <option value="Drama">Drama</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Descripción</label>

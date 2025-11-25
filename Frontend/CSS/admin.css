@@ -257,7 +257,7 @@ body {
 /* Stats Grid */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 2rem;
   margin-bottom: 3rem;
 }
@@ -265,7 +265,7 @@ body {
 .stat-card {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  padding: 2rem;
+  padding: 10px;
   border-radius: 15px;
   display: flex;
   align-items: center;
@@ -280,8 +280,8 @@ body {
 }
 
 .stat-icon {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -292,10 +292,10 @@ body {
 }
 
 .stat-info h3 {
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: 700;
   color: #333;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.1rem;
 }
 
 .stat-info p {
@@ -526,26 +526,48 @@ body {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border-radius: 15px;
-  overflow: hidden;
+  overflow: auto; /* permitir scroll horizontal si la tabla es ancha */
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 .admin-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto; /* permitir que columnas se ajusten al contenido */
+  font-size: 1rem; /* aumentar legibilidad */
 }
 
 .admin-table th {
   background: linear-gradient(135deg, #667eea, #764ba2);
   color: white;
-  padding: 1rem;
+  padding: 1.1rem 1rem;
   text-align: left;
   font-weight: 600;
+  font-size: 1rem;
 }
 
 .admin-table td {
-  padding: 1rem;
+  padding: 0.95rem 1rem;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  vertical-align: middle;
+  white-space: normal; /* permitir salto de línea para mostrar contenido largo */
+  word-break: break-word;
+}
+
+/* Thumbnails inside admin tables */
+.admin-table .book-thumb {
+  width: 56px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 6px;
+  vertical-align: middle;
+  margin-right: 10px;
+  display: inline-block;
+}
+
+/* Ensure books table is at least as wide as orders table for readability */
+.admin-books-table {
+  min-width: 900px; /* forces horizontal scroll on small screens, matching orders table visual width */
 }
 
 .admin-table tr:hover {
@@ -644,11 +666,24 @@ body {
   gap: 2rem;
 }
 
+/* When on the admin 'Books' section we want the grid container to behave
+   like a block so tables inside can expand and scroll horizontally. */
+#books .books-grid {
+  display: block;
+  padding: 0.5rem 0;
+}
+
+#books .books-grid .table-container {
+  margin-top: 12px;
+  width: 100%;
+  overflow: auto; /* ensure horizontal scroll if table is wider */
+}
+
 .book-card {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border-radius: 15px;
-  padding: 1.5rem;
+  padding: 1rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
 }

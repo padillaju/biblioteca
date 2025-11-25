@@ -259,31 +259,180 @@ document.addEventListener("DOMContentLoaded", function() {
 
 // Cargar libros destacados desde el servidor y mostrarlos en la página
 document.addEventListener('DOMContentLoaded', function() {
+    // Cargar todos los libros al inicio y renderizarlos en la sección principal
     fetch('/libros')
         .then(r => r.json())
         .then(data => {
-            const books = (data && data.success && Array.isArray(data.books)) ? data.books : []
-            const grid = document.getElementById('books-grid')
-            if (!grid) return
-
-            grid.innerHTML = books.map(book => `
-                <div class="book-card">
-                    <img src="${book.image || '/abstract-book-cover.png'}" alt="${(book.title||'').replace(/"/g,'&quot;')}" class="book-image">
-                    <div class="book-content">
-                        <h3 class="book-title">${(book.title||'')}</h3>
-                        <p class="book-author">por ${book.author || 'Desconocido'}</p>
-                        <p class="book-price">$${Number(book.price||0).toLocaleString()}</p>
-                        <div class="book-actions">
-                            <button class="btn btn-primary" onclick="openModal('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '${(book.description||'').replace(/'/g, "\\'")}', '${book.image || ''}', '$${Number(book.price||0).toLocaleString()}')">Ver más</button>
-                            <button class="btn btn-secondary" onclick="addToCart('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '$${Number(book.price||0).toLocaleString()}', '${book.image || ''}')">Añadir</button>
-                            <button class="btn btn-save" onclick="saveBook('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '$${Number(book.price||0).toLocaleString()}', '${book.image || ''}')">Guardar</button>
-                        </div>
-                    </div>
-                </div>
-            `).join('')
+            const books = (data && data.success && Array.isArray(data.books)) ? data.books : [];
+            renderBooksList(books);
         })
-        .catch(err => console.warn('No se pudieron cargar libros destacados:', err))
+        .catch(err => console.warn('No se pudieron cargar libros:', err))
 })
+
+// Cargar géneros disponibles para el filtro (panel con checkboxes)
+document.addEventListener('DOMContentLoaded', function() {
+    const panelList = document.getElementById('genre-list');
+    const toggle = document.getElementById('genre-toggle');
+    if (!panelList || !toggle) return;
+
+    const defaultGenres = ['Fantasía','Ficción','Historia','Romance','Terror','Aventura','Drama','No ficción'];
+
+    function renderGenresList(list) {
+        panelList.innerHTML = '';
+        list.forEach(rawG => {
+            const g = String(rawG || '').trim();
+            if (!g) return;
+            const opt = document.createElement('button');
+            opt.type = 'button';
+            opt.className = 'genre-option';
+            opt.textContent = g;
+            opt.addEventListener('click', function(e) {
+                e.stopPropagation();
+                setSelectedGenre(g);
+                // cargar libros inmediatamente al seleccionar
+                searchBooks();
+            });
+            panelList.appendChild(opt);
+        });
+    }
+
+    fetch('/generos')
+        .then(r => r.json())
+        .then(data => {
+            const genres = (data && data.success && Array.isArray(data.genres)) ? data.genres : (Array.isArray(data) ? data : []);
+            if (!genres || genres.length === 0) {
+                renderGenresList(defaultGenres);
+            } else {
+                renderGenresList(genres);
+            }
+        })
+        .catch(err => {
+            console.warn('No se pudieron cargar géneros, usando lista por defecto:', err);
+            renderGenresList(defaultGenres);
+        });
+
+    // Toggle behavior
+    toggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleGenrePanel();
+    });
+
+    // Nota: el botón "Limpiar" fue eliminado; la selección se limpia desde el chip.
+
+    // Cerrar panel al hacer click fuera
+    document.addEventListener('click', function(e) {
+        const panel = document.getElementById('genre-panel');
+        if (!panel) return;
+        const isInside = panel.contains(e.target) || toggle.contains(e.target);
+        if (!isInside) {
+            panel.hidden = true;
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+    });
+});
+
+function getSelectedGenres() {
+    const toggle = document.getElementById('genre-toggle');
+    if (!toggle) return [];
+    const sel = String(toggle.dataset.selected || '').trim();
+    return sel ? [sel.toLowerCase()] : [];
+}
+
+// Normalizar cadenas para comparación (quita acentos y pasa a lower-case)
+function normalizeStr(s) {
+    if (!s) return '';
+    try {
+        return String(s).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    } catch (e) {
+        // Fallback cuando no se soportan clases Unicode en el engine
+        return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+}
+
+function renderGenreChips() {
+    const chips = document.getElementById('genre-chips');
+    if (!chips) return;
+    chips.innerHTML = '';
+    const selected = (function(){
+        const t = document.getElementById('genre-toggle');
+        return t && t.dataset && t.dataset.selected ? [t.dataset.selected] : [];
+    })();
+    if (selected.length === 0) {
+        document.getElementById('genre-toggle').innerHTML = 'Todos los géneros <i class="fas fa-chevron-down"></i>';
+        return;
+    }
+    selected.forEach(g => {
+        const chip = document.createElement('div');
+        chip.className = 'genre-chip';
+        const txt = document.createElement('span');
+        txt.textContent = g;
+        const btn = document.createElement('button');
+        btn.className = 'remove-chip';
+        btn.innerHTML = '×';
+        btn.addEventListener('click', function() {
+            setSelectedGenre('');
+        });
+        chip.appendChild(txt);
+        chip.appendChild(btn);
+        chips.appendChild(chip);
+    });
+    document.getElementById('genre-toggle').innerHTML = `${selected[0]} <i class="fas fa-chevron-down"></i>`;
+}
+
+function setSelectedGenre(genre) {
+    const toggle = document.getElementById('genre-toggle');
+    const panel = document.getElementById('genre-panel');
+    if (!toggle) return;
+    const g = String(genre || '').trim();
+    if (!g) {
+        delete toggle.dataset.selected;
+    } else {
+        toggle.dataset.selected = g;
+    }
+    renderGenreChips();
+    if (panel) panel.hidden = true;
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+function toggleGenrePanel() {
+    const panel = document.getElementById('genre-panel');
+    const toggle = document.getElementById('genre-toggle');
+    if (!panel || !toggle) return;
+    const isHidden = panel.hidden;
+    panel.hidden = !isHidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+}
+
+// Render helper para mostrar una lista de libros en `#resultado`
+function renderBooksList(books) {
+    const resultsContainer = document.getElementById('resultado');
+    if (!resultsContainer) return;
+    if (!Array.isArray(books) || books.length === 0) {
+        resultsContainer.innerHTML = '<div class="no-results">No hay libros para mostrar.</div>';
+        const countEl = document.getElementById('results-count'); if (countEl) countEl.textContent = '0 resultados';
+        return;
+    }
+
+    const html = books.map(book => `
+        <div class="book-card">
+            <img src="${book.image || '/abstract-book-cover.png'}" alt="${(book.title||'').replace(/"/g,'&quot;')}" class="book-image">
+            <div class="book-content">
+                <h3 class="book-title">${(book.title||'')}</h3>
+                <p class="book-author">por ${book.author || 'Desconocido'}</p>
+                <p class="book-price">$${Number(book.price||0).toLocaleString()}</p>
+                <div class="book-actions">
+                    <button class="btn btn-primary" onclick="openModal('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '${(book.description||'').replace(/'/g, "\\'").substring(0,200)}', '${book.image || ''}', '$${Number(book.price||0).toLocaleString()}')">Ver más</button>
+                    <button class="btn btn-secondary" onclick="addToCart('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '$${Number(book.price||0).toLocaleString()}', '${book.image || ''}')">Añadir</button>
+                    <button class="btn btn-save" onclick="saveBook('${book.id}', '${(book.title||'').replace(/'/g, "\\'")}', '${(book.author||'').replace(/'/g, "\\'")}', '$${Number(book.price||0).toLocaleString()}', '${book.image || ''}')">Guardar</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    resultsContainer.innerHTML = html;
+    const countEl = document.getElementById('results-count');
+    if (countEl) countEl.textContent = `${books.length} resultado(s)`;
+}
 
 
 
@@ -291,80 +440,59 @@ document.addEventListener('DOMContentLoaded', function() {
 function searchBooks() {
     console.log("Buscando libros...");
     const query = document.getElementById("search-input").value;
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1`;
+    const q = String(query || '').trim().toLowerCase();
+    // Leer filtros de precio (usar parseNumberString para soportar separadores de miles)
+    const minPriceRaw = document.getElementById('min-price') ? document.getElementById('min-price').value : '';
+    const maxPriceRaw = document.getElementById('max-price') ? document.getElementById('max-price').value : '';
+    const minPrice = minPriceRaw ? parseNumberString(minPriceRaw) : null;
+    const maxPrice = maxPriceRaw ? parseNumberString(maxPriceRaw) : null;
+    const resultsContainer = document.getElementById("resultado");
+    resultsContainer.innerHTML = "";
 
-    fetch(url)
-        .then(response => response.json())
+    // Si no hay texto de búsqueda ni género seleccionado y tampoco filtros de precio, mostrar mensaje.
+    // Permitir continuar si el usuario especificó min/max precio aunque q y género estén vacíos.
+    const selected = getSelectedGenres();
+    if (!q && (!selected || selected.length === 0) && minPrice == null && maxPrice == null) {
+        resultsContainer.innerHTML = '<div class="no-results">Ingresa un término para buscar, selecciona un género o especifica un rango de precio.</div>';
+        const rc = document.getElementById('results-count'); if (rc) rc.textContent = '';
+        return;
+    }
+
+    // Construir endpoint: si hay texto usamos ?search=, si no (solo género) pedimos todos y filtramos en cliente
+    const params = [`search=${encodeURIComponent(q)}`];
+    const endpoint = (q && q.length > 0) ? `/libros?${params.join('&')}` : `/libros`;
+    fetch(endpoint)
+        .then(r => r.json())
         .then(data => {
-            const books = data.items;
-            const resultsContainer = document.getElementById("resultado");
-            resultsContainer.innerHTML = ""; // Limpiar resultados anteriores
+            let books = (data && data.success && Array.isArray(data.books)) ? data.books : [];
 
-            if (books && books.length > 0) {
-                // 🔹 Filtrar solo los libros que tengan precio disponible
-                const booksWithPrice = books.filter(book => 
-                    book.saleInfo && book.saleInfo.listPrice && book.saleInfo.listPrice.amount > 0
-                );
-
-                // 🔹 Si no hay ninguno con precio, mostrar mensaje
-                if (booksWithPrice.length === 0) {
-                    resultsContainer.innerHTML = '<div class="no-results">No se encontraron libros con precio disponible.</div>';
-                    return;
-                }
-
-                // 🔹 Mostrar solo los libros con precio
-                booksWithPrice.forEach(book => {
-                    const title = book.volumeInfo.title;
-                    const authors = book.volumeInfo.authors ? book.volumeInfo.authors.join(", ") : "Autor desconocido";
-                    const description = book.volumeInfo.description || "No disponible";
-                    const imageUrl = book.volumeInfo.imageLinks
-                        ? book.volumeInfo.imageLinks.thumbnail
-                        : "https://via.placeholder.com/200x300?text=Sin+Imagen";
-                    const price = `$${book.saleInfo.listPrice.amount.toLocaleString()}`;
-
-                    const bookElement = document.createElement("div");
-                    bookElement.classList.add("book-card");
-
-                    bookElement.innerHTML = `
-                        <div class="book-card">
-                            <img src="${imageUrl}" alt="Portada del libro: ${title}" class="book-image" loading="lazy">
-                            <div class="book-content">
-                                <h3 class="book-title">${title}</h3>
-                                <p class="book-author">por ${authors}</p>
-                                <p class="book-price">${price}</p>
-                                <div class="book-actions">
-                                    <button class="btn btn-primary" 
-                                        onclick="openModal('${book.id}', '${title.replace(/'/g, "\\'")}', '${authors.replace(/'/g, "\\'")}', '${description.replace(/'/g, "\\'").substring(0, 200)}...', '${imageUrl}', '${price}')"
-                                        aria-label="Ver más detalles del libro ${title}">
-                                        Ver más
-                                    </button>
-                                    <button class="btn btn-secondary" 
-                                        onclick="addToCart(
-                                            '${book.id}', 
-                                            '${title.replace(/'/g, "\\'")}', 
-                                            '${authors.replace(/'/g, "\\'")}', 
-                                            '${price}', 
-                                            '${imageUrl}'
-                                        )" 
-                                        aria-label="Añadir ${title} al carrito">
-                                        Añadir
-                                    </button>
-                                    <button class="btn btn-save" 
-                                        onclick="saveBook('${book.id}', '${title.replace(/'/g, "\\'")}', '${authors.replace(/'/g, "\\'")}', '${price}', '${imageUrl}')" 
-                                        aria-label="Guardar ${title} en favoritos">
-                                        Guardar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    resultsContainer.appendChild(bookElement);
+            // Filtrar por género seleccionado en la UI (si aplica)
+            const selectedGenres = getSelectedGenres();
+            if (selectedGenres && selectedGenres.length > 0) {
+                const sel = normalizeStr(selectedGenres[0]);
+                books = books.filter(book => {
+                    const g = normalizeStr(book.genre || book.genero || '');
+                    return g === sel;
                 });
-            } else {
-                resultsContainer.innerHTML = '<div class="no-results">No se encontraron libros para tu búsqueda.</div>';
             }
+
+            // Filtrar por precio (si el usuario especificó)
+            if (minPrice != null || maxPrice != null) {
+                books = books.filter(book => {
+                    const priceVal = parseNumberString(book.price || book.precio || 0) || 0;
+                    if (minPrice != null && priceVal < minPrice) return false;
+                    if (maxPrice != null && priceVal > maxPrice) return false;
+                    return true;
+                });
+            }
+
+            // Usar el helper para renderizar la lista final
+            renderBooksList(books);
         })
-        .catch(error => console.error("Error al buscar libros:", error));
+        .catch(err => {
+            console.error('Error cargando libros locales:', err);
+            resultsContainer.innerHTML = '<div class="no-results">No se pudieron cargar los libros. Intenta de nuevo más tarde.</div>';
+        });
 }
 
 

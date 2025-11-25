@@ -17,6 +17,27 @@
     <header>
         <nav class="container">
               <div class="logo">BookVerse</div>
+              <div class="header-search-wrapper">
+                  <div class="search-bar header-search">
+                      <input type="text" id="search-input" placeholder="Busca tu libro favorito...">
+
+                      <div class="genre-filter-wrapper">
+                          <button id="genre-toggle" class="genre-toggle" aria-expanded="false">Todos los géneros <i class="fas fa-chevron-down"></i></button>
+                          <div id="genre-panel" class="genre-panel" hidden>
+                              <div id="genre-list" class="genre-list"></div>
+                          </div>
+                          <div id="genre-chips" class="genre-chips"></div>
+                      </div>
+
+                      <div class="price-filters">
+                          <input type="text" id="min-price" class="price-input" placeholder="Min">
+                          <input type="text" id="max-price" class="price-input" placeholder="Max">
+                      </div>
+
+                      <button class="search-btn" onclick="searchBooks()">Buscar</button>
+                  </div>
+              </div>
+
               <div class="header-actions">
                  <button class="account-btn active" onclick="goMiCuenta()">
                      <i class="fas fa-user-circle"></i> Mi Cuenta
@@ -67,12 +88,11 @@
     <section class="hero" id="home">
     <div class="container">
         <h1>Descubre Tu Próxima Aventura</h1>
-        <!-- <p>Miles de libros esperándote. Envío gratis en pedidos superiores a $50.000</p> -->
-        <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Busca tu libro favorito...">
-            <button class="search-btn" onclick="searchBooks()">Buscar</button>
+        <div class="results-meta">
+            <span id="results-count" class="results-count"></span>
         </div>
-        <!-- Contenedor de tarjetas -->
+
+       
         <div id="resultado" class="books-container"></div>
     </div>
 </section>
@@ -96,15 +116,7 @@
     </div>
 </div>
 
-    <!-- Books Section -->
-    <section class="books-section" id="libros">
-        <div class="container">
-            <h2 class="section-title">Libros Destacados</h2>
-            <div class="books-grid" id="books-grid">
-                <!-- Los libros se generarán dinámicamente -->
-            </div>
-        </div>
-    </section>
+    <!-- Books Section removed: books render in main results area -->
 
     <!-- Cart Sidebar -->
     <div class="cart-sidebar" id="cart-sidebar">

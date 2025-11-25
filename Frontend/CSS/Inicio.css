@@ -104,21 +104,29 @@ nav {
 
 
 .account-btn,
-.cart-btn {
-  background: rgba(255, 255, 255, 0.2);
-  color:linear-gradient(45deg, #667eea, #764ba2);
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 25px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 0.9rem;
+.search-btn {
+    position: relative;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    height: 28px;
+    min-width: 64px;
+    border-radius: 14px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.18s ease;
+    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.account-btn.active {
-  background: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+.search-btn i { 
+    font-size: 0.95rem; 
+
 }
+
 
 .cart-btn:hover {
   background: rgba(255, 255, 255, 0.3);
@@ -670,6 +678,175 @@ nav {
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
 
+/* Filtro de géneros: panel y chips */
+.genre-filter-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 12px;
+    position: relative;
+}
+
+.genre-toggle {
+    background: rgba(255,255,255,0.95);
+    border: none;
+    padding: 6px 8px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.genre-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.10);
+    padding: 8px;
+    min-width: 160px;
+    z-index: 60;
+    max-height: 220px;
+    overflow: auto;
+}
+
+.genre-list label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.92rem;
+}
+
+.genre-list input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.genre-list .genre-option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.92rem;
+}
+
+.genre-list .genre-option:hover {
+    background: rgba(102,126,234,0.05);
+}
+
+.genre-chips {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    max-width: 180px;
+}
+
+.genre-chip {
+    background: rgba(102,126,234,0.10);
+    color: #2b2b2b;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.genre-chip .remove-chip {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #667eea;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.clear-genres {
+    background: transparent;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.results-meta {
+    /* Ocultar el contador de resultados en la sección principal */
+    display: none;
+}
+
+.results-count {
+    background: rgba(0,0,0,0.25);
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+/* Header-specific smaller search */
+.header-search-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    justify-content: center;
+}
+
+.header-search {
+    max-width: 720px;
+    width: 100%;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 999px;
+    padding-left: 8px;
+    font-size: 0.95rem;
+}
+
+.header-search input#search-input {
+    padding: 8px 10px;
+    border-radius: 16px;
+    width: 36%;
+    font-size: 0.95rem;
+}
+
+.price-filters {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.price-input {
+    width: 48px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.08);
+    font-size: 0.82rem;
+    height: 28px;
+    box-sizing: border-box;
+}
+
+.price-input::placeholder {
+    font-size: 0.78rem;
+}
+
+/* Make header search responsive */
+@media (max-width: 900px) {
+    .header-search input#search-input { width: 45%; }
+    .header-search { max-width: 100%; }
+}
+
 /* ============= BOOKS SECTION ============= */
 .books-section {
     padding: 6rem 0;
@@ -702,6 +879,15 @@ nav {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 2rem;
     margin-top: 4rem;
+}
+
+/* Contenedor principal donde se renderizan los libros (grid en filas) */
+.books-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+    align-items: start;
 }
 
 /* ============= BOOK CARDS ============= */
