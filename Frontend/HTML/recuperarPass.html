@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Recuperar contraseña</title>
+
+  <!-- Iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- MISMO CSS DEL LOGIN -->
+  <link rel="stylesheet" href="../CSS/login.css">
+</head>
+<body>
+
+  <div class="login-card">
+    <h2>Recuperar contraseña</h2>
+
+    <!-- Puedes usar form o no, no afecta tu lógica -->
+    <form onsubmit="event.preventDefault(); enviarCorreo();">
+      
+      <div class="input-group">
+        <i class="fa-solid fa-envelope input-icon"></i>
+        <input type="email" id="correo" placeholder="Correo electrónico" required>
+        <small class="field-error" id="correo-error"></small>
+      </div>
+
+      <button type="submit" id="loginBtn">Enviar</button>
+
+    </form>
+
+    <!-- Mensaje -->
+    <div id="resultado"></div>
+
+    <!-- Volver -->
+    <div class="forgot-password-container">
+      <button type="button" class="forgot-password-btn" onclick="window.location.href='login.html'">
+        Volver al inicio de sesión
+      </button>
+    </div>
+
+  </div>
+
+  <script src="../JS/recuperarPass.js"></script>
+</body>
+</html>

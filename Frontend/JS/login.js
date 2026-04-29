@@ -111,3 +111,9 @@ form.addEventListener('submit', async (e) => {
     loginBtn.textContent = originalText;
   }
 });
+
+
+
+function RecuperarPass() {
+  window.location.href = '../HTML/recuperarPass.html';
+}

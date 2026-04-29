@@ -48,7 +48,7 @@ const db = mysql.createPool({
   database: 'TiendaLibro'
 });
 
-
+let tokens = {};
 
 
 db.getConnection((err, connection) => {
@@ -56,7 +56,103 @@ db.getConnection((err, connection) => {
     console.error("Error al conectar con la base de datos:", err);
   } else {
     console.log(" Conectado a la base de datos");
-    connection.release(); // devolvemos la conexión al pool
+    connection.release();
+  }
+});
+
+// funciona
+
+// app.post("/recuperarPass", (req, res) => {
+//   try {
+//     const { correo } = req.body;
+
+//     console.log("Correo recibido:", correo);
+
+//     const token = Math.random().toString(36).substring(2);
+
+//     console.log("Token generado:", token);
+
+//     tokens[token] = correo;
+
+//     const link = `http://localhost:3000/HTML/reset.html?token=${token}`;
+
+//     console.log("LINK:", link);
+
+//     res.json({ link });
+
+//   } catch (error) {
+//     console.error("🔥 ERROR REAL:", error); // 👈 CLAVE
+//     res.status(500).json({ mensaje: "Error en servidor" });
+//   }
+// });
+
+
+
+// crear la nueva contraseña 
+
+
+app.post("/recuperarPass", async (req, res) => {
+  try {
+    const { correo } = req.body;
+
+    console.log("Correo recibido:", correo);
+
+    // 🔍 Buscar usuario
+    const [rows] = await db.promise().query(
+      "SELECT * FROM usuario WHERE correo = ?",
+      [correo]
+    );
+
+    // ❌ Si no existe
+    if (rows.length === 0) {
+      return res.json({ mensaje: "El correo no está registrado" });
+    }
+
+    const token = Math.random().toString(36).substring(2);
+
+    tokens[token] = correo;
+
+    const link = `http://localhost:3000/HTML/reset.html?token=${token}`;
+
+    console.log("LINK:", link);
+
+    res.json({ link, mensaje: "Correo válido" });
+
+  } catch (error) {
+    console.error("🔥 ERROR REAL:", error);
+    res.status(500).json({ mensaje: "Error en servidor" });
+  }
+});
+
+
+
+
+app.post("/resetPassword", async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    console.log("TOKEN:", token);
+
+    const correo = tokens[token];
+
+    console.log("CORREO:", correo);
+
+    if (!correo) {
+      return res.json({ mensaje: "Token inválido o expirado" });
+    }
+
+    await db.promise().query(
+      "UPDATE usuario SET contrasena = ? WHERE correo = ?",
+      [password, correo]
+    );
+
+    delete tokens[token];
+
+    res.json({ mensaje: "Contraseña actualizada correctamente" });
+
+  } catch (error) {
+    console.error("🔥 ERROR REAL:", error);
+    res.status(500).json({ mensaje: "Error en servidor" });
   }
 });
 
@@ -113,11 +209,7 @@ db.promise().query("ALTER TABLE libros MODIFY COLUMN image MEDIUMTEXT")
 db.promise().query("ALTER TABLE libros ADD COLUMN genre VARCHAR(255) NULL")
   .then(() => console.log('✅ Columna `genre` añadida a `libros`'))
   .catch(err => {
-    // Ignorar error si ya existe u otros errores no críticos
     if (err && err.code !== 'ER_DUP_FIELDNAME' && err.errno !== 1060) {
-      // ER_DUP_FIELDNAME / errno 1060 means column exists in some MySQL versions
-      // Ignore otherwise log
-      // console.warn('No se pudo crear la columna genre (posible que ya exista):', err.message || err);
     }
   });
 
@@ -200,6 +292,7 @@ app.get('/proveedores', async (req, res) => {
   }
 });
 
+
 // Crear proveedor
 app.post('/proveedores', async (req, res) => {
   try {
@@ -220,6 +313,7 @@ app.post('/proveedores', async (req, res) => {
     res.status(500).json({ success: false, message: 'Error al crear proveedor' });
   }
 });
+
 
 // Eliminar proveedor
 app.delete('/proveedores/:id', async (req, res) => {
@@ -254,6 +348,7 @@ app.delete('/proveedores/:id', async (req, res) => {
     res.status(500).json({ success: false, message: 'Error eliminando proveedor' });
   }
 });
+
 
 // Actualizar proveedor
 app.put('/proveedores/:id', async (req, res) => {

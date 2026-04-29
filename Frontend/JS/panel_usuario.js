@@ -41,4 +41,3 @@
 
     // Mostrar favoritos por defecto
     mostrar("favoritos");
-  

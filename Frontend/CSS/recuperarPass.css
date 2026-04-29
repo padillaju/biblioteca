@@ -1,27 +1,23 @@
-
-/* === Fuente y estilo base === */
+/* === Fuente === */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
 
-
-/* Evita que inputs se salgan del contenedor */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* === Fondo === */
 body {
-  margin: 0;
-  padding: 0;
   font-family: "Poppins", sans-serif;
-  background: linear-gradient(135deg, #5A00E0, #009DFF); /* Morado → Azul */
+  background: linear-gradient(135deg, #5A00E0, #009DFF);
   height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-/* === Tarjeta del login === */
+/* === Card === */
 .login-card {
   background: #ffffff;
   padding: 40px 35px;
@@ -39,12 +35,12 @@ body {
 
 .login-card h2 {
   margin-bottom: 25px;
-  color: #4A00B5; /* tono violeta oscuro */
+  color: #4A00B5;
   font-size: 26px;
   font-weight: 600;
 }
 
-/* === Inputs === */
+/* === Input === */
 .input-group {
   position: relative;
   margin-bottom: 25px;
@@ -52,45 +48,29 @@ body {
 
 .input-group input {
   width: 100%;
-  padding: 12px 45px 12px 40px;
+  padding: 12px 15px 12px 40px;
   border-radius: 12px;
   border: 2px solid #d8d8d8;
+  font-size: 14px;
 }
 
-
 .input-group input:focus {
-  border-color: #7300FF; /* Morado */
+  outline: none;
+  border-color: #7300FF;
   box-shadow: 0 0 6px rgba(115, 0, 255, 0.3);
 }
 
-/* Icono a la izquierda */
+/* Icono */
 .input-icon {
   position: absolute;
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
   color: #7300FF;
-  font-size: 18px;
+  font-size: 16px;
 }
 
-/* Botón mostrar contraseña */
-.toggle-pass {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #555;
-  font-size: 17px;
-}
-
-.toggle-pass:hover {
-  color: #7300FF;
-}
-
-/* === Botón Login === */
+/* === Botón === */
 #loginBtn {
   width: 100%;
   padding: 12px;
@@ -109,7 +89,14 @@ body {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
-/* === Enlace registro === */
+/* === Mensaje === */
+#resultado {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #333;
+}
+
+/* === Link === */
 .switch-link {
   margin-top: 18px;
   font-size: 14px;
@@ -123,43 +110,4 @@ body {
 
 .switch-link a:hover {
   text-decoration: underline;
-}
-
-/* === Mensajes de error === */
-.field-error {
-  display: block;
-  text-align: left;
-  margin-top: 6px;
-  color: #D80032;
-  font-size: 13px;
-}
-
-/* Mensaje general */
-#mensaje {
-  margin-top: 12px;
-  font-size: 14px;
-}
-
-
-/* === Botón Olvidaste tu contraseña === */
-.forgot-password-container {
-  text-align: center;
-  margin-bottom: 18px;
-}
-
-.forgot-password-btn {
-  background: none;
-  border: none;
-  color: #6B00FF;
-  font-size: 14px;
-  text-align: center;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0;
-  transition: color 0.2s;
-}
-
-.forgot-password-btn:hover {
-  color: #009DFF;
 }
