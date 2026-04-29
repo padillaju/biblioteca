@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +12,7 @@
     <link rel="stylesheet" href="../CSS/admin.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
+
 <body>
     <header class="admin-header">
         <div class="header-content">
@@ -68,7 +70,7 @@
                 <h2>Dashboard</h2>
                 <p>Resumen general de la tienda</p>
             </div>
-            
+
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon">
@@ -99,14 +101,14 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">
-                       <i class="fas fa-book-open"></i>
+                        <i class="fas fa-book-open"></i>
                     </div>
                     <div class="stat-info">
                         <h3 id="totalBooks">0</h3>
                         <p>Cantidad de libros</p>
                     </div>
                 </div>
-               
+
             </div>
 
             <div class="dashboard-charts">
@@ -140,55 +142,56 @@
         </section>
 
         <section id="inventory" class="admin-section">
-                <div class="section-header">
-        <h2>Inventario</h2>
-        <div class="section-actions">
-           
-            <div class="form-group">
+            <div class="section-header">
+                <h2>Inventario</h2>
+                <div class="section-actions">
+
+                    <div class="form-group">
+                    </div>
+                </div>
             </div>
-        </div> 
-    </div> 
 
-    <!-- Agregando tabs para organizar la vista de inventario -->
-    <div class="inventory-tabs">
-        <button class="inventory-tab active" data-tab="stock">
-            <i class="fas fa-boxes"></i>
-            <span>Stock de Productos</span>
-        </button>
-        <button class="inventory-tab" data-tab="suppliers">
-            <i class="fas fa-truck"></i>
-            <span>Proveedores</span>
-        </button>
-        <button class="inventory-tab" data-tab="purchase-orders">
-            <i class="fas fa-file-invoice"></i>
-            <span>Órdenes de Compra</span>
-        </button>
-    </div>
-<!-- Tab de Stock de Productos -->
-    <div class="inventory-tab-content active" id="stock-tab">
-        <div class="inventory-stats" id="inventoryStats" style="margin-bottom:12px; display:flex; gap:12px; flex-wrap:wrap;">
-            <!-- Totales y tarjetas renderizadas dinámicamente -->
-        </div>
+            <!-- Agregando tabs para organizar la vista de inventario -->
+            <div class="inventory-tabs">
+                <button class="inventory-tab active" data-tab="stock">
+                    <i class="fas fa-boxes"></i>
+                    <span>Stock de Productos</span>
+                </button>
+                <button class="inventory-tab" data-tab="suppliers">
+                    <i class="fas fa-truck"></i>
+                    <span>Proveedores</span>
+                </button>
+                <button class="inventory-tab" data-tab="purchase-orders">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>Órdenes de Compra</span>
+                </button>
+            </div>
+            <!-- Tab de Stock de Productos -->
+            <div class="inventory-tab-content active" id="stock-tab">
+                <div class="inventory-stats" id="inventoryStats"
+                    style="margin-bottom:12px; display:flex; gap:12px; flex-wrap:wrap;">
+                    <!-- Totales y tarjetas renderizadas dinámicamente -->
+                </div>
 
-        <div class="table-container">
-            <table class="admin-table" style="width:100%;">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Título</th>
-                        <th>Autor</th>
-                        <th>Género</th>
-                        <th>Precio Unitario</th>
-                        <th>Stock</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="inventoryReport">
-                    <!-- filas llenadas dinámicamente -->
-                </tbody>
-            </table>
-        </div>
-    </div>
+                <div class="table-container">
+                    <table class="admin-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Título</th>
+                                <th>Autor</th>
+                                <th>Género</th>
+                                <th>Precio Unitario</th>
+                                <th>Stock</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryReport">
+                            <!-- filas llenadas dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             <!-- Tab de Proveedores (solo diseño UI) -->
             <div class="inventory-tab-content" id="suppliers-tab">
@@ -200,7 +203,7 @@
                     </button>
                 </div>
 
-               
+
 
                 <div id="suppliersContainer" class="suppliers-list">
                 </div>
@@ -216,7 +219,8 @@
                 </div>
 
                 <div class="purchase-filters">
-                    <input type="text" id="purchaseSupplierSearch" placeholder="Buscar por proveedor..." style="min-width:220px;" />
+                    <input type="text" id="purchaseSupplierSearch" placeholder="Buscar por proveedor..."
+                        style="min-width:220px;" />
                     <button class="btn-secondary" onclick="filterPurchaseOrders()">Filtrar</button>
                 </div>
 
@@ -235,9 +239,12 @@
                         <tbody id="purchaseOrdersTable">
                             <tr class="empty-state">
                                 <td colspan="6" style="text-align: center; padding: 3rem;">
-                                    <i class="fas fa-file-invoice" style="font-size: 3rem; color: #ddd; margin-bottom: 1rem; display: block;"></i>
-                                    <p style="color: #999; margin-bottom: 1rem;">No hay órdenes de compra registradas</p>
-                                    <button class="btn-primary" onclick="openNewPurchaseOrderModal()">Crear Primera Orden</button>
+                                    <i class="fas fa-file-invoice"
+                                        style="font-size: 3rem; color: #ddd; margin-bottom: 1rem; display: block;"></i>
+                                    <p style="color: #999; margin-bottom: 1rem;">No hay órdenes de compra registradas
+                                    </p>
+                                    <button class="btn-primary" onclick="openNewPurchaseOrderModal()">Crear Primera
+                                        Orden</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -264,7 +271,7 @@
                     <button class="btn-secondary" id="applyOrderFilter" style="margin-left:8px;">Aplicar</button>
                 </div>
             </div>
-            
+
             <div class="table-container">
                 <table class="admin-table">
                     <thead>
@@ -273,10 +280,29 @@
                             <th>Cliente</th>
                             <th>Fecha</th>
                             <th>Total</th>
+                            <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="ordersTable">
+                        <tr>
+                            <td>123</td>
+                            <td>Ejemplo Cliente</td>
+                            <td>2026-04-28</td>
+                            <td>$2000</td>
+                            <td>
+                                <select class="order-status-select" data-order-id="123">
+                                    <option value="pendiente"> Pendiente</option>
+                                    <option value="procesando"> Procesando</option>
+                                    <option value="enviado"> Enviado</option>
+                                    <option value="entregado"> Entregado</option>
+                                </select>
+                            </td>
+                            <td>
+                                <button>Ver</button>
+
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -286,15 +312,15 @@
             <div class="section-header">
                 <h2>Gestión de Usuarios</h2>
                 <div class="section-actions">
-                                        <input type="text" id="userSearch" placeholder="Buscar usuario...">
-                                        <label style="display:flex;align-items:center;gap:8px;margin-left:12px;font-size:0.95rem;">
-                                            <input type="checkbox" id="showInactiveUsers" />
-                                            <span style="font-size:0.9rem;color:#444;">Mostrar inactivos</span>
-                                        </label>
-                   
+                    <input type="text" id="userSearch" placeholder="Buscar usuario...">
+                    <label style="display:flex;align-items:center;gap:8px;margin-left:12px;font-size:0.95rem;">
+                        <input type="checkbox" id="showInactiveUsers" />
+                        <span style="font-size:0.9rem;color:#444;">Mostrar inactivos</span>
+                    </label>
+
                 </div>
             </div>
-            
+
             <div class="table-container">
                 <table class="admin-table">
                     <thead>
@@ -318,8 +344,10 @@
                 <h2>Libros <span id="booksCount" style="font-size:0.9rem; color:#666; margin-left:8px;"></span></h2>
                 <div class="section-actions">
                     <div style="display:flex;gap:8px;align-items:center;">
-                        <input type="text" id="admin-book-search" placeholder="Buscar título o autor..." style="min-width:220px;padding:6px 8px;border-radius:6px;border:1px solid #ddd;">
-                        <select id="admin-search-field" style="padding:6px 8px;border-radius:6px;border:1px solid #ddd;">
+                        <input type="text" id="admin-book-search" placeholder="Buscar título o autor..."
+                            style="min-width:220px;padding:6px 8px;border-radius:6px;border:1px solid #ddd;">
+                        <select id="admin-search-field"
+                            style="padding:6px 8px;border-radius:6px;border:1px solid #ddd;">
                             <option value="all">Todos</option>
                             <option value="title">Título</option>
                             <option value="author">Autor</option>
@@ -328,9 +356,9 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="books-grid" id="featuredBooks">
-                 Se llena dinámicamente 
+                Se llena dinámicamente
             </div>
         </section>
 
@@ -340,7 +368,7 @@
             <div class="section-header">
                 <h2>Configuración de la Tienda</h2>
             </div>
-            
+
             <div class="settings-grid">
                 <div class="settings-card">
                     <h3>Información General</h3>
@@ -349,12 +377,12 @@
                             <label>Nombre de la Tienda</label>
                             <input type="text" id="storeName" value="BookStore">
                         </div>
-                        
+
                         <div class="form-group">
                             <label>Teléfono</label>
                             <input type="tel" id="storePhone" value="+57 300 123 4567">
                         </div>
-                         <div class="form-group">
+                        <div class="form-group">
                             <label>Nuevo email </label>
                             <input type="email" id="newEmail" placeholder="nuevo-email@ejemplo.com" />
                         </div>
@@ -365,11 +393,11 @@
                         <button type="submit" class="btn-primary">Guardar Cambios</button>
                     </form>
                 </div>
-                
+
                 <div class="settings-card">
                     <h3>Cambio de Credenciales</h3>
                     <form id="credentialsForm">
-                        
+
                         <div class="form-group">
                             <label>Contraseña actual</label>
                             <input type="password" id="currentPassword" placeholder="Contraseña actual" required />
@@ -378,12 +406,12 @@
                             <label>Nueva contraseña</label>
                             <input type="password" id="newPassword" placeholder="Nueva contraseña" />
                         </div>
-                       
+
                         <div class="form-group">
                             <label>Confirmar nueva contraseña</label>
                             <input type="password" id="confirmNewPassword" placeholder="Repite la nueva contraseña" />
                         </div>
-                       
+
                         <button type="submit" class="btn-primary">Actualizar credenciales</button>
                     </form>
                 </div>
@@ -436,7 +464,7 @@
         </div>
     </div>
 
-     <!-- Modal para ver detalles del pedido  -->
+    <!-- Modal para ver detalles del pedido  -->
     <div id="orderDetailsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -444,7 +472,7 @@
                 <span class="close" onclick="closeOrderDetailsModal()">&times;</span>
             </div>
             <div id="orderDetailsContent">
-                 Se llena dinámicamente 
+                Se llena dinámicamente
             </div>
         </div>
     </div>
@@ -512,8 +540,8 @@
                     <label>Fecha de Orden</label>
                     <input type="date" id="purchaseDate" required>
                 </div>
-               
-                
+
+
                 <h4 style="margin: 1.5rem 0 1rem; color: #333;">Productos</h4>
                 <div id="purchaseProductsList">
                     <div class="purchase-product-item">
@@ -521,7 +549,8 @@
                         <input type="text" class="purchase-author" placeholder="Autor" />
                         <input type="text" class="purchase-genre" placeholder="Género" />
                         <input type="number" class="purchase-quantity" placeholder="Cantidad" min="1" value="1" />
-                        <input type="number" class="purchase-unit-price" placeholder="Precio unitario" min="0" step="0.01" value="0" />
+                        <input type="number" class="purchase-unit-price" placeholder="Precio unitario" min="0"
+                            step="0.01" value="0" />
                         <button type="button" class="btn-danger btn-sm" onclick="removePurchaseProduct(this)">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -532,7 +561,8 @@
                     Agregar Producto
                 </button>
 
-                <div class="purchase-total" style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                <div class="purchase-total"
+                    style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
                     <h4 style="text-align: right; color: #333;">Total: $<span id="purchaseTotal">0.00</span></h4>
                 </div>
 
@@ -551,4 +581,5 @@
 
     <script src="../JS/admin.js"></script>
 </body>
+
 </html>

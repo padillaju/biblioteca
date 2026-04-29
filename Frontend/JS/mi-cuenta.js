@@ -1,5 +1,198 @@
 
 
+// ===== BANCO: Lógica de cuenta bancaria en perfil =====
+document.addEventListener('DOMContentLoaded', function () {
+
+  const addBtn = document.getElementById('add-bank-btn');
+  const form = document.getElementById('bank-account-form');
+  const view = document.getElementById('bank-account-view');
+  const mensaje = document.getElementById("bank-message");
+
+  // Mostrar formulario
+  if (addBtn) {
+    addBtn.onclick = function () {
+      addBtn.style.display = 'none';
+      form.style.display = 'block';
+      view.style.display = 'none';
+      if (form.reset) form.reset();
+      if (mensaje) mensaje.innerText = "";
+    };
+  }
+
+  // Cargar cuenta al iniciar
+  mostrarCuentaBancaria();
+
+  // ===== GUARDAR CUENTA =====
+  if (form) form.onsubmit = async function (e) {
+    e.preventDefault();
+
+
+     const mensaje = document.getElementById("bank-message"); 
+
+    const banco = document.getElementById('bank-name').value.trim();
+    const titular = document.getElementById('bank-holder').value.trim();
+    const clabe = document.getElementById('bank-clabe').value.trim();
+    const tipo = document.getElementById('bank-type').value;
+
+    // Validación
+    if (!banco || !titular || !clabe || clabe.length !== 18) {
+      mensaje.innerText = "Completa todos los campos correctamente ❌";
+      mensaje.className = "form-message error";
+      return;
+    }
+
+    const cuenta = { banco, titular, clabe, tipo };
+
+    //  Cargando
+    mensaje.innerText = "Guardando cuenta...";
+    mensaje.className = "form-message loading";
+
+    try {
+      const resp = await fetch('http://localhost:3000/cuenta-bancaria', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cuenta)
+      });
+
+      const data = await resp.json();
+
+      if (!data.success) throw new Error(data.message);
+
+      //  Éxito
+      mensaje.innerText = "Cuenta guardada correctamente ";
+      mensaje.className = "form-message success";
+
+      mostrarCuentaBancaria();
+
+      form.style.display = 'none';
+      addBtn.style.display = 'none';
+      view.style.display = 'block';
+
+      // Limpiar mensaje después de unos segundos
+      setTimeout(() => {
+        mensaje.innerText = "";
+      }, 3000);
+
+    } catch (err) {
+      mensaje.innerText = "Error al guardar la cuenta ❌";
+      mensaje.className = "form-message error";
+    }
+  };
+});
+
+
+// ===== MOSTRAR CUENTA DESDE BACKEND =====
+async function mostrarCuentaBancaria() {
+  try {
+    const resp = await fetch('http://localhost:3000/cuenta-bancaria', {
+      method: 'GET',
+      credentials: 'include'
+    });
+
+    const data = await resp.json();
+
+    if (!data.success || !data.cuenta) return;
+
+    const cuenta = data.cuenta;
+
+    document.getElementById('bank-view-bank').innerText = cuenta.banco;
+    document.getElementById('bank-view-holder').innerText = cuenta.titular;
+
+    //  Ocultar CLABE (solo últimos 4)
+    const ultimos = cuenta.clabe.slice(-4);
+    document.getElementById('bank-view-clabe').innerText = "**** **** " + ultimos;
+
+    document.getElementById('bank-view-type').innerText = cuenta.tipo;
+
+    document.getElementById('bank-account-view').style.display = 'block';
+    document.getElementById('add-bank-btn').style.display = 'none';
+    document.getElementById('bank-account-form').style.display = 'none';
+
+  } catch (error) {
+    console.error("Error cargando cuenta:", error);
+  }
+}
+
+
+async function cargarCuentaEnCheckout() {
+  try {
+    const resp = await fetch("http://localhost:3000/cuenta-bancaria", {
+      method: "GET",
+      credentials: "include"
+    });
+
+    const data = await resp.json();
+
+    if (!data.success || !data.cuenta) {
+      console.warn("No hay cuenta bancaria");
+      return;
+    }
+
+    const cuenta = data.cuenta;
+
+    // Llenar campos
+    document.getElementById("checkout-bank").value = cuenta.banco;
+    document.getElementById("checkout-holder").value = cuenta.titular;
+
+    // Ocultar cuenta (solo últimos 4)
+    const ultimos = cuenta.clabe.slice(-4);
+    document.getElementById("checkout-account").value = "**** **** " + ultimos;
+
+  } catch (error) {
+    console.error("Error cargando cuenta en checkout:", error);
+  }
+  cargarCuentaEnCheckout();
+}
+
+
+
+// ELIMINAR LA CEUNTA BANCARIA
+async function deleteBankAccount() {
+  const mensaje = document.getElementById("bank-message");
+
+  // 🔄 estado cargando
+  if (mensaje) {
+    mensaje.innerText = "Eliminando cuenta...";
+    mensaje.className = "form-message loading";
+  }
+
+  try {
+    const resp = await fetch('http://localhost:3000/cuenta-bancaria', {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+
+    const data = await resp.json();
+
+    if (!data.success) throw new Error();
+
+    // 🧹 limpiar UI
+    localStorage.removeItem('userBankAccount');
+
+    document.getElementById('bank-account-view').style.display = 'none';
+    document.getElementById('add-bank-btn').style.display = 'block';
+
+    //  mensaje éxito
+    if (mensaje) {
+      mensaje.innerText = "Cuenta eliminada correctamente ✅";
+      mensaje.className = "form-message success";
+    }
+
+  } catch (error) {
+    console.error(error);
+
+    // mensaje error
+    if (mensaje) {
+      mensaje.innerText = "Error al eliminar la cuenta ❌";
+      mensaje.className = "form-message error";
+    }
+  }
+}
+
+
+
+
 function loadCart() {
   fetch('http://localhost:3000/carrito', { credentials: 'include' })
     .then(res => res.json())
@@ -979,26 +1172,23 @@ function parseNumberString(input) {
 function proceedToCheckout() {
   fetch('http://localhost:3000/carrito', { credentials: 'include' })
     .then(res => res.json().catch(() => ({ success: false, items: [] })))
-    .then(data => {
-      let items = (data && data.success && Array.isArray(data.items)) ? data.items : []
+    .then(async data => {
 
-      // Merge: combinar items del servidor con los locales para incluir los
-      // que aún no se sincronizaron. Esto evita que el checkout muestre menos
-      // items que la UI del carrito (que ya hace merge en loadCart).
+      let items = (data && data.success && Array.isArray(data.items)) ? data.items : [];
+
       try {
-        items = mergeServerAndLocal(items)
+        items = mergeServerAndLocal(items);
       } catch (e) {
-        // fallback: si ocurre algo, usar comportamiento anterior
         if (!items || items.length === 0) {
           try {
-            const local = getCart() || []
-            if (local && local.length > 0) items = local
-          } catch (err) { /* ignore */ }
+            const local = getCart() || [];
+            if (local && local.length > 0) items = local;
+          } catch (err) {}
         }
       }
 
       if (!items || items.length === 0) {
-        try { showNotification('Tu carrito está vacío o no se pudo cargar.', 'warning') } catch (e) { console.warn('Tu carrito está vacío o no se pudo cargar.') }
+        showNotification('Tu carrito está vacío o no se pudo cargar.', 'warning');
         return;
       }
 
@@ -1010,10 +1200,11 @@ function proceedToCheckout() {
       let total = 0;
 
       items.forEach(item => {
-        const qty = Number(item.cantidad || item.quantity || 0)
-        const price = parseNumberString(item.precio_unitario || item.precio || item.price || item.price_unitario || 0)
+        const qty = Number(item.cantidad || item.quantity || 0);
+        const price = parseNumberString(item.precio_unitario || item.precio || item.price || item.price_unitario || 0);
         const itemTotal = price * qty;
         total += itemTotal;
+
         html += `
           <div class="checkout-item">
             <p><strong>${item.titulo || item.title}</strong> x${qty}</p>
@@ -1025,30 +1216,85 @@ function proceedToCheckout() {
       checkoutItems.innerHTML = html;
       checkoutTotal.textContent = `$${total.toLocaleString()}`;
 
-      // Prefill checkout fields from stored user session (editable)
+      // ===== 🔥 CUENTA BANCARIA + VALIDACIÓN =====
       try {
-        const user = JSON.parse(localStorage.getItem('userSession')) || {}
-        const nameEl = document.getElementById('checkout-name')
-        const emailEl = document.getElementById('checkout-email')
-        const phoneEl = document.getElementById('checkout-phone')
-        const addressEl = document.getElementById('checkout-address')
+        const resp = await fetch('http://localhost:3000/cuenta-bancaria', {
+          credentials: 'include'
+        });
 
-        if (nameEl) nameEl.value = user.nombre || user.name || ''
-        if (emailEl) emailEl.value = user.email || user.correo || ''
-        if (phoneEl) phoneEl.value = user.telefono || user.celular || ''
-        if (addressEl) addressEl.value = user.direccion || user.address || ''
+        const dataCuenta = await resp.json();
+        const cuenta = dataCuenta && dataCuenta.success && dataCuenta.cuenta ? dataCuenta.cuenta : null;
+
+        const paymentMethod = document.getElementById('checkout-payment-method');
+        const cardFields = document.getElementById('credit-card-fields');
+        const confirmBtn = document.querySelector('.modal-footer .btn-primary');
+
+        let resumen = document.getElementById('bank-summary-checkout');
+
+        if (!resumen) {
+          resumen = document.createElement('div');
+          resumen.id = 'bank-summary-checkout';
+          resumen.className = 'form-group';
+          document.querySelector('.checkout-form').appendChild(resumen);
+        }
+
+        if (cuenta && cuenta.clabe) {
+
+          // ✅ HAY CUENTA
+          if (confirmBtn) confirmBtn.disabled = false;
+
+          if (paymentMethod) paymentMethod.style.display = 'none';
+          if (cardFields) cardFields.style.display = 'none';
+
+          const ultimos = cuenta.clabe.slice(-4);
+
+          resumen.innerHTML = `
+            <div class="bank-checkout-box">
+              <p class="bank-title">Método de pago</p>
+              <p><strong>${cuenta.banco}</strong></p>
+              <p>${cuenta.titular}</p>
+              <p class="bank-account">**** ${ultimos}</p>
+            </div>
+          `;
+
+        } else {
+
+          // ❌ NO HAY CUENTA
+          if (confirmBtn) confirmBtn.disabled = true;
+
+          if (paymentMethod) paymentMethod.style.display = '';
+          if (cardFields) cardFields.style.display = '';
+
+          resumen.innerHTML = `
+            <p style="color:#D80032; font-weight:600; text-align:center;">
+              Debes agregar una cuenta bancaria para continuar ❌
+            </p>
+          `;
+        }
+
       } catch (e) {
-        // ignore parse errors
+        console.error("Error cuenta bancaria:", e);
       }
 
-      // Mostrar el modal (usar flex para centrar según CSS `.modal`)
+      // ===== DATOS USUARIO =====
+      try {
+        const user = JSON.parse(localStorage.getItem('userSession')) || {};
+
+        document.getElementById('checkout-name').value = user.nombre || '';
+        document.getElementById('checkout-email').value = user.correo || '';
+        document.getElementById('checkout-phone').value = user.celular || '';
+        document.getElementById('checkout-address').value = user.direccion || '';
+      } catch (e) {}
+
+      // ===== MOSTRAR MODAL =====
       checkoutModal.style.display = 'flex';
     })
     .catch(err => {
       console.error('Error al obtener carrito para checkout:', err);
-      try { showNotification('Hubo un error al cargar el carrito.', 'warning') } catch (e) { console.warn('Hubo un error al cargar el carrito.') }
+      showNotification('Hubo un error al cargar el carrito.', 'warning');
     });
 }
+
 
 
 // cierra modal de pago============
@@ -1072,17 +1318,17 @@ function confirmOrder() {
   fetch("http://localhost:3000/carrito", { credentials: "include" })
     .then(res => res.json().catch(() => ({ success: false, items: [] })))
     .then(data => {
-        let items = (data && data.success && Array.isArray(data.items)) ? data.items : []
-        // Asegurar que incluimos también items locales no sincronizados
-        try {
-          items = mergeServerAndLocal(items)
-        } catch (e) {
-          if (!items || items.length === 0) {
-            try { items = getCart() || [] } catch (err) { items = [] }
-          }
-        }
-
+      let items = (data && data.success && Array.isArray(data.items)) ? data.items : []
+      // Asegurar que incluimos también items locales no sincronizados
+      try {
+        items = mergeServerAndLocal(items)
+      } catch (e) {
         if (!items || items.length === 0) {
+          try { items = getCart() || [] } catch (err) { items = [] }
+        }
+      }
+
+      if (!items || items.length === 0) {
         try { showNotification("Tu carrito está vacío. Agrega libros antes de confirmar el pedido.", 'warning') } catch (e) { console.warn('Tu carrito está vacío. Agrega libros antes de confirmar el pedido.') }
         return;
       }
@@ -1103,49 +1349,39 @@ function confirmOrder() {
       });
     })
     .then(res => res ? res.json() : null)
-   .then(orderData => {
-  if (orderData && orderData.success) {
-    try { showNotification("Pedido confirmado correctamente.", 'success') } catch (e) { console.log('Pedido confirmado correctamente.') }
-    
-    closeCheckoutModal();
+    .then(orderData => {
+      if (orderData && orderData.success) {
+        try { showNotification("Pedido confirmado correctamente.", 'success') } catch (e) { console.log('Pedido confirmado correctamente.') }
+        closeCheckoutModal();
 
-    // Marcar carrito como completado
-    fetch("http://localhost:3000/carrito/finalizar", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: 1 }),
+        // Limpiar el carrito local
+        try { localStorage.removeItem('bookCart'); } catch (e) { /* ignore */ }
+
+        // Limpiar el carrito en el backend
+        fetch("http://localhost:3000/carrito/limpiar", {
+          method: "DELETE",
+          credentials: "include"
+        }).then(() => {
+          setTimeout(() => {
+            loadCart();
+            loadOrders();
+          }, 500);
+        });
+      } else {
+        console.error("Error al confirmar pedido:", orderData);
+        try { showNotification("Ocurrió un error al confirmar el pedido.", 'warning') } catch (e) { console.error('Ocurrió un error al confirmar el pedido.') }
+      }
     })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          console.log("Carrito finalizado en BD");
-
-          // Limpiar el carrito del frontend
-          fetch("http://localhost:3000/carrito/limpiar", {
-            method: "DELETE",
-          }).then(() => {
-            // Espera medio segundo antes de recargar la interfaz
-            setTimeout(() => {
-              loadCart();
-              loadOrders();
-            }, 500);
-          });
-        } else {
-          console.warn("No se pudo finalizar el carrito:", data.message);
-        }
-      });
-  } else {
-    console.error("Error al confirmar pedido:", orderData);
-    try { showNotification("Ocurrió un error al confirmar el pedido.", 'warning') } catch (e) { console.error('Ocurrió un error al confirmar el pedido.') }
-  }
-})
-
     .catch(err => {
       console.error("Error al procesar pedido:", err);
       try { showNotification("Error de conexión al procesar el pedido.", 'warning') } catch (e) { console.error('Error de conexión al procesar el pedido.') }
     });
 }
 
+
+
+
+// ============MIS PEDIDOS=================
 
 function showTab(tabName) {
   // Ocultar todas las pestañas de contenido
@@ -1172,9 +1408,16 @@ function showTab(tabName) {
   if (tabName === "orders") loadOrders();
 }
 
+
+
+// ===== CARGA LOS PEDIDOS =====
+let todosLosPedidos = []; // guardamos todos para filtrar
+let paginaActual = 1;
+const PEDIDOS_POR_PAGINA = 4;
+
 function loadOrders() {
-  // Mostrar mensaje de carga
   const ordersItems = document.getElementById("orders-items");
+
   ordersItems.innerHTML = `
     <div class="loading-state">
       <i class="fas fa-spinner fa-spin"></i>
@@ -1182,91 +1425,178 @@ function loadOrders() {
     </div>
   `;
 
-  fetch("http://localhost:3000/mis-pedidos", { credentials: "include" })
+  fetch("/mis-pedidos", { credentials: "include" })
     .then(res => res.json())
     .then(data => {
-      ordersItems.innerHTML = "";
-
-      // Actualizar el contador de pedidos
-      const ordersStat = document.getElementById("orders-stat");
-      console.log("Elemento contador encontrado:", ordersStat); // 👈 agrega esto
-      if (ordersStat) {
-        const totalPedidos = data.success && data.pedidos ? data.pedidos.length : 0;
-        console.log("📦 Total de pedidos:", totalPedidos);
-        ordersStat.textContent = totalPedidos;
-      }
-
-
-
-      if (!data.success || data.pedidos.length === 0) {
+      if (!data.success || !data.pedidos.length) {
         ordersItems.innerHTML = `
           <div class="empty-state">
             <i class="fas fa-box"></i>
             <h3>No tienes pedidos</h3>
-            <p>Tus pedidos aparecerán aquí una vez que realices una compra</p>
-            <button class="btn-primary" onclick="goToHome()">Explorar Libros</button>
-          </div>`;
+          </div>
+        `;
         return;
       }
 
-      let html = "";
-
-      data.pedidos.forEach(order => {
-        let statusText = "";
-        let statusClass = "";
-
-        switch (order.estado) {
-          case "pendiente":
-            // Ocultar el estado "Pendiente" en la vista según petición
-            statusText = "";
-            statusClass = "";
-            break;
-          case "enviado":
-            statusText = "Enviado";
-            statusClass = "status-shipped";
-            break;
-          case "entregado":
-            statusText = "Entregado";
-            statusClass = "status-delivered";
-            break;
-          default:
-            statusText = order.estado;
-            statusClass = "status-default";
-        }
-
-        const itemCount = order.libros.reduce((sum, libro) => sum + libro.cantidad, 0);
-
-        html += `
-          <div class="order-card">
-              <div class="order-header">
-                  <div>
-                      <div class="order-number">Pedido #${order.id_pedido}</div>
-                      <div style="color: #666; font-size: 0.9rem;">
-                          ${new Date(order.fecha_creacion).toLocaleDateString()}
-                      </div>
-                  </div>
-                    ${statusText ? `<div class="order-status ${statusClass}">${statusText}</div>` : ''}
-              </div>
-              <div class="order-items">
-                  <strong>Artículos:</strong> ${itemCount} | 
-                  <strong>Total:</strong> $${order.total.toLocaleString()}
-              </div>
-          </div>
-        `;
-      });
-
-      ordersItems.innerHTML = html;
+      todosLosPedidos = data.pedidos;
+      paginaActual = 1;
+      renderPedidos(todosLosPedidos);
     })
     .catch(err => {
-      console.error("Error al cargar pedidos:", err);
-      ordersItems.innerHTML = `
-        <div class="error-state">
-          <i class="fas fa-exclamation-triangle"></i>
-          <p>No se pudieron cargar tus pedidos. Intenta de nuevo.</p>
-        </div>
-      `;
+      console.error(err);
+      ordersItems.innerHTML = `<div class="error-state"><p>Error al cargar pedidos</p></div>`;
     });
 }
+
+// ===== FILTRAR POR BUSCADOR =====
+function filterOrders() {
+  const query = document.getElementById("searchOrdersInput").value.toLowerCase().trim();
+
+  const filtrados = todosLosPedidos.filter(order => {
+    // buscar por ID
+    const porId = String(order.id_pedido).includes(query);
+    
+    // buscar por estado
+    const porEstado = (order.estado || '').toLowerCase().includes(query);
+    
+    // buscar por nombre de libro
+    const porLibro = order.libros.some(libro =>
+      (libro.titulo || '').toLowerCase().includes(query)
+    );
+
+    return porId || porEstado || porLibro;
+  });
+
+  paginaActual = 1;
+  renderPedidos(filtrados);
+}
+
+// ===== RENDERIZA CON PAGINACIÓN =====
+function renderPedidos(pedidos) {
+  const ordersItems = document.getElementById("orders-items");
+  ordersItems.innerHTML = "";
+
+  if (pedidos.length === 0) {
+    ordersItems.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-search"></i>
+        <h3>No se encontraron pedidos</h3>
+      </div>
+    `;
+    return;
+  }
+
+  const totalPaginas = Math.ceil(pedidos.length / PEDIDOS_POR_PAGINA);
+  const inicio = (paginaActual - 1) * PEDIDOS_POR_PAGINA;
+  const pedidosPagina = pedidos.slice(inicio, inicio + PEDIDOS_POR_PAGINA);
+
+  let html = "";
+
+  pedidosPagina.forEach(order => {
+    let statusText = "";
+    let statusClass = "";
+
+    switch (order.estado) {
+      case "pendiente":   statusText = "⏳ Pendiente";  statusClass = "status-pending";    break;
+      case "procesando":  statusText = "👨‍🍳 Procesando"; statusClass = "status-processing"; break;
+      case "enviado":     statusText = "🚚 Enviado";    statusClass = "status-shipped";    break;
+      case "entregado":   statusText = "✅ Entregado";  statusClass = "status-delivered";  break;
+      case "cancelado":   statusText = "❌ Cancelado";  statusClass = "status-cancelled";  break;
+      default:            statusText = order.estado;    statusClass = "status-default";
+    }
+
+    const itemCount = order.libros.reduce((sum, libro) => sum + libro.cantidad, 0);
+
+    const librosHtml = order.libros.map(libro => `
+      <li>${libro.titulo || "Libro sin nombre"} (x${libro.cantidad})</li>
+    `).join("");
+
+    html += `
+  <div class="order-card">
+    <div class="order-header">
+      <div>
+        <div class="order-number">Pedido #${order.id_pedido}</div>
+        <div style="color:#666; font-size:0.9rem">${new Date(order.fecha_creacion).toLocaleDateString()}</div>
+      </div>
+      <div class="order-status ${statusClass}">${statusText}</div>
+    </div>
+
+    <div class="order-items">
+      <div class="order-items-info">
+        <div><strong>Artículos:</strong> ${itemCount} | <strong>Total:</strong> $${order.total.toLocaleString()}</div>
+        <ul>${librosHtml}</ul>
+      </div>
+      <button class="btn-primary btn-small" onclick="generarFacturaPedido(${order.id_pedido})">
+        📄 Generar factura
+      </button>
+    </div>
+  </div>
+`;
+  });
+
+  // PAGINACIÓN
+  if (totalPaginas > 1) {
+    html += `<div class="pagination">`;
+
+    html += `<button 
+      onclick="cambiarPagina(${paginaActual - 1}, this)" 
+      ${paginaActual === 1 ? 'disabled' : ''}>
+      ← Anterior
+    </button>`;
+
+    for (let i = 1; i <= totalPaginas; i++) {
+      html += `<button 
+        onclick="cambiarPagina(${i}, this)"
+        class="${i === paginaActual ? 'active' : ''}">
+        ${i}
+      </button>`;
+    }
+
+    html += `<button 
+      onclick="cambiarPagina(${paginaActual + 1}, this)"
+      ${paginaActual === totalPaginas ? 'disabled' : ''}>
+      Siguiente →
+    </button>`;
+
+    html += `</div>`;
+  }
+
+  ordersItems.innerHTML = html;
+}
+
+// ===== CAMBIAR PÁGINA =====
+function cambiarPagina(nuevaPagina) {
+  const query = document.getElementById("searchOrdersInput").value.toLowerCase().trim();
+  const filtrados = todosLosPedidos.filter(order =>
+    String(order.id_pedido).includes(query) ||
+    (order.estado || '').toLowerCase().includes(query)
+  );
+
+  const totalPaginas = Math.ceil(filtrados.length / PEDIDOS_POR_PAGINA);
+  if (nuevaPagina < 1 || nuevaPagina > totalPaginas) return;
+
+  paginaActual = nuevaPagina;
+  renderPedidos(filtrados);
+}
+
+
+
+
+// =====funcon de genea factra
+
+function generarFacturaPedido(idPedido) {
+  const a = document.createElement('a');
+  a.href = `/mis-pedidos/${idPedido}/factura`;
+  a.download = `factura-pedido-${idPedido}.pdf`;
+  a.click();
+}
+
+
+
+
+
+
+
 
 
 

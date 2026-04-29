@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,8 +12,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="../CSS/mi-cuenta.css">
 </head>
+
 <body>
-     
+
     <header>
         <nav class="container">
             <div class="logo" onclick="goToHome()">BookVerse</div>
@@ -23,12 +25,12 @@
                 <li><a href="#ofertas">Ofertas</a></li>
                 <li><a href="#contacto">Contacto</a></li>
             </ul> -->
-                <div class="header-actions">
+            <div class="header-actions">
                 <button class="account-btn active" onclick="goToHome()">
                     <i class="fas fa-home"></i> inicio
                 </button>
-                  <button class="account-btn" onclick="logout()">
-                      <i class="fas fa-sign-out-alt"></i> cerrar sesión
+                <button class="account-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> cerrar sesión
                 </button>
                 <!-- <button class="cart-btn" onclick="showTab('cart')">
                     <i class="fas fa-shopping-cart"></i> Carrito (<span id="header-cart-count">0</span>)
@@ -85,6 +87,8 @@
                 </button>
             </div>
 
+
+            <!-- ==========MI CARRITO========== -->
             <div class="tab-content">
                 <div id="cart-tab" class="tab-pane active">
                     <div class="section-header">
@@ -120,10 +124,15 @@
                     </div>
                 </div>
 
+
+
+
+                <!-- ============MIS FAVORITOS========== -->
                 <div id="favorites-tab" class="tab-pane">
                     <div class="section-header">
                         <h2><i class="fas fa-heart"></i> Mis Favoritos</h2>
-                        <button class="btn-danger" onclick="clearFavorites()" id="clear-favorites-btn" style="display: none;">
+                        <button class="btn-danger" onclick="clearFavorites()" id="clear-favorites-btn"
+                            style="display: none;">
                             <i class="fas fa-trash"></i> Limpiar Favoritos
                         </button>
                     </div>
@@ -137,11 +146,21 @@
                     </div>
                 </div>
 
+
+                <!-- ======== MIS PEDIDOS ========= -->
+
                 <div id="orders-tab" class="tab-pane">
                     <div class="section-header">
                         <h2><i class="fas fa-box"></i> Mis Pedidos</h2>
+                        <div class="orders-search">
+                            <input type="text" id="searchOrdersInput" placeholder="Buscar por ID, estado o nombre del libro..." oninput="filterOrders()"/>
+                        </div>
                     </div>
+                    
+                    
+
                     <div id="orders-items" class="orders-list">
+                      
                         <div class="empty-state">
                             <i class="fas fa-box"></i>
                             <h3>No tienes pedidos</h3>
@@ -151,7 +170,8 @@
                     </div>
                 </div>
 
-            <!-- =========PERFIL========= -->
+
+                <!-- =========PERFIL========= -->
 
                 <div id="profile-tab" class="tab-pane">
                     <div class="section-header">
@@ -170,12 +190,14 @@
 
                             <div class="form-group">
                                 <label for="profile-current-password-input">Contraseña actual</label>
-                                <input type="password" id="profile-current-password-input" placeholder="Ingresa tu contraseña actual">
+                                <input type="password" id="profile-current-password-input"
+                                    placeholder="Ingresa tu contraseña actual">
                             </div>
 
                             <div class="form-group">
                                 <label for="profile-new-password-input">Contraseña nueva</label>
-                                <input type="password" id="profile-new-password-input" placeholder="Ingresa la nueva contraseña">
+                                <input type="password" id="profile-new-password-input"
+                                    placeholder="Ingresa la nueva contraseña">
                             </div>
 
                             <div class="form-group">
@@ -190,7 +212,8 @@
                                 <label for="profile-photo-input">Foto de Perfil</label>
                                 <input type="file" id="profile-photo-input" accept="image/*">
                                 <div class="avatar-preview-wrapper">
-                                    <img id="profile-avatar-preview" src="" alt="Previsualización" style="display:none; width:100px; height:100px; object-fit:cover; border-radius:50%; margin-top:8px;" />
+                                    <img id="profile-avatar-preview" src="" alt="Previsualización"
+                                        style="display:none; width:100px; height:100px; object-fit:cover; border-radius:50%; margin-top:8px;" />
                                 </div>
                             </div>
 
@@ -225,13 +248,77 @@
                                     <li><strong>Dirección:</strong> <span id="meta-address"></span></li>
                                 </ul>
                             </div>
-                        </aside>
-                    </div>
 
+                            <!-- ====== CUENTA BANCARIA ====== -->
+                            <div class="bank-account-section" style="margin-top:2.5rem;">
+                                <h4>Cuenta Bancaria</h4>
+                                <div id="bank-account-view" style="display:none;">
+                                    <div class="form-group">
+                                        <label>Banco:</label>
+                                        <span id="bank-view-bank"></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Titular:</label>
+                                        <span id="bank-view-holder"></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Cuenta CLABE:</label>
+                                        <span id="bank-view-clabe"></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Tipo de Cuenta:</label>
+                                        <span id="bank-view-type"></span>
+                                    </div>
+                                    <button class="btn-danger btn-small" onclick="deleteBankAccount()"
+                                        style="margin-top:1rem;">Eliminar cuenta</button>
+                                </div>
+                                <form id="bank-account-form" style="display:none; margin-top:1.5rem;">
+                                    <div class="form-group">
+                                        <label for="bank-name">Banco</label>
+                                        <select id="bank-name" required>
+                                            <option value="">Selecciona un banco</option>
+                                            <option value="nequi">Nequi</option>
+                                            <option value="bancolombia">Bancolombia</option>
+                                            <option value="davivienda">Davivienda</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="bank-holder">Titular</label>
+                                        <input type="text" id="bank-holder" placeholder="Nombre del titular" required>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="bank-clabe">Cuenta CLABE</label>
+                                        <input type="text" id="bank-clabe" placeholder="18 dígitos" maxlength="18"
+                                            pattern="[0-9]{18}" required>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="bank-type">Tipo de Cuenta</label>
+                                        <select id="bank-type" required>
+                                            <option value="ahorro">Ahorro</option>
+                                            <option value="debito">Débito</option>
+                                        </select>
+                                    </div>
+
+                                    <button type="submit" class="btn-primary btn-small">Guardar cuenta</button>
+                                </form>
+
+                                <!-- 🔥 IMPORTANTE: fuera del form -->
+                                <div id="bank-message" class="form-message"></div>
+                                <button id="add-bank-btn" class="btn-secondary btn-small"
+                                    style="margin-top:1.5rem;">Agregar cuenta bancaria</button>
+                            </div>
+                    </div>
+                    </aside>
                 </div>
+
             </div>
         </div>
+        </div>
     </main>
+
 
     <div id="checkout-modal" class="modal">
         <div class="modal-content">
@@ -261,40 +348,45 @@
                     <div class="form-group">
                         <textarea id="checkout-address" placeholder="Dirección de entrega" required></textarea>
                     </div>
+
+                    <div class="form-group">
+
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="closeCheckoutModal()">Cancelar</button>
+                    <button class="btn-primary" onclick="confirmOrder()">
+                        <i class="fas fa-check"></i> Confirmar Pedido
+                    </button>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn-secondary"  onclick="closeCheckoutModal()">Cancelar</button>
-                <button class="btn-primary" onclick="confirmOrder()">
-                    <i class="fas fa-check"></i> Confirmar Pedido
-                </button>
+        </div>
+
+        <div class="notification" id="notification">
+            <span id="notification-text">Notificación</span>
+        </div>
+
+
+
+        <!-- Logout Confirmation Modal -->
+        <div id="logout-modal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-sign-out-alt"></i> Cerrar sesión</h3>
+                    <button id="logout-modal-close" class="close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Estás seguro de que quieres cerrar sesión?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="cancelLogout()">Cancelar</button>
+                    <button class="btn-danger" onclick="confirmLogout()">Cerrar sesión</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="notification" id="notification">
-        <span id="notification-text">Notificación</span>
-    </div>
-
-
-
-    <!-- Logout Confirmation Modal -->
-<div id="logout-modal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3><i class="fas fa-sign-out-alt"></i> Cerrar sesión</h3>
-      <button id="logout-modal-close" class="close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p>¿Estás seguro de que quieres cerrar sesión?</p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="cancelLogout()">Cancelar</button>
-      <button class="btn-danger" onclick="confirmLogout()">Cerrar sesión</button>
-    </div>
-  </div>
-</div>
-
-    <script src="../JS/mi-cuenta.js"></script>
+        <script src="../JS/mi-cuenta.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
+
 </html>

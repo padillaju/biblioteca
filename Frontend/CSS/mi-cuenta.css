@@ -529,6 +529,66 @@ nav {
   color: #721c24;
 }
 
+.order-items {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.order-items-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0 0;
+}
+
+.order-items-info ul li {
+  color: #555;
+  font-size: 0.9rem;
+  padding: 2px 0;
+}
+
+
+/* Estados - corregir nombres de clases */
+.status-pending    { background: #fff3cd; color: #856404; }
+.status-processing { background: #cce5ff; color: #004085; }
+.status-shipped    { background: #e2d9f3; color: #4a235a; }
+.status-delivered  { background: #d4edda; color: #155724; }
+.status-cancelled  { background: #f8d7da; color: #721c24; }
+.status-default    { background: #e9ecef; color: #495057; }
+
+/* Buscador */
+.orders-search input {
+  padding: 8px 14px;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  font-size: 14px;
+  width: 280px;
+  outline: none;
+  transition: border .2s;
+}
+.orders-search input:focus { border-color: #6B21A8; }
+
+/* Paginación */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+.pagination button {
+  padding: 6px 14px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all .2s;
+}
+.pagination button:hover:not(:disabled) { background: #6B21A8; color: #fff; border-color: #6B21A8; }
+.pagination button.active               { background: #6B21A8; color: #fff; border-color: #6B21A8; }
+.pagination button:disabled             { opacity: .4; cursor: not-allowed; }
+
 /* Buttons */
 .btn-primary,
 .btn-secondary,
@@ -768,7 +828,69 @@ nav {
 
 
 
+.form-message {
+  margin-top: 10px;
+  font-size: 14px;
+  text-align: center;
+}
 
+.form-message.loading {
+  color: #555;
+}
+
+.form-message.success {
+  color: #00a86b;
+}
+
+.form-message.error {
+  color: #d80032;
+}
+
+
+
+
+
+/* meotod el pago en el moda de pago */
+
+.bank-checkout-box {
+  background: #f5f7ff;
+  padding: 14px;
+  border-radius: 12px;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.bank-title {
+  font-size: 14px;
+  color: #6B00FF;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.bank-account {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+/* eliminar cuenta mensaje */
+.form-message {
+  margin-top: 10px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.form-message.success {
+  color: #16a34a;
+}
+
+.form-message.error {
+  color: #D80032;
+}
+
+.form-message.loading {
+  color: #6B00FF;
+}
 
 /* Notification */
 .notification {
@@ -803,6 +925,20 @@ nav {
 .notification-info {
   background: #17a2b8;
 }
+
+
+
+
+/* move bton de edescarga de factura al frente */
+
+
+/* .btn-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+} */
+
+
 
 /* Responsive Design */
 @media (max-width: 768px) {

@@ -2,7 +2,9 @@ const express = require('express');
 const path = require('path');
 const mysql = require('mysql2');
 const bodyParser = require('body-parser');
-const session = require('express-session'); // solo una vez
+const session = require('express-session'); 
+const PDFDocument = require('pdfkit');
+
 
 const app = express();
 const PORT = 3000;
@@ -60,64 +62,29 @@ db.getConnection((err, connection) => {
   }
 });
 
-// funciona
-
-// app.post("/recuperarPass", (req, res) => {
-//   try {
-//     const { correo } = req.body;
-
-//     console.log("Correo recibido:", correo);
-
-//     const token = Math.random().toString(36).substring(2);
-
-//     console.log("Token generado:", token);
-
-//     tokens[token] = correo;
-
-//     const link = `http://localhost:3000/HTML/reset.html?token=${token}`;
-
-//     console.log("LINK:", link);
-
-//     res.json({ link });
-
-//   } catch (error) {
-//     console.error("🔥 ERROR REAL:", error); // 👈 CLAVE
-//     res.status(500).json({ mensaje: "Error en servidor" });
-//   }
-// });
 
 
 
 // crear la nueva contraseña 
-
 
 app.post("/recuperarPass", async (req, res) => {
   try {
     const { correo } = req.body;
 
     console.log("Correo recibido:", correo);
-
-    // 🔍 Buscar usuario
     const [rows] = await db.promise().query(
       "SELECT * FROM usuario WHERE correo = ?",
       [correo]
     );
 
-    // ❌ Si no existe
+    //  Si no existe
     if (rows.length === 0) {
       return res.json({ mensaje: "El correo no está registrado" });
     }
-
     const token = Math.random().toString(36).substring(2);
-
     tokens[token] = correo;
-
     const link = `http://localhost:3000/HTML/reset.html?token=${token}`;
-
-    console.log("LINK:", link);
-
     res.json({ link, mensaje: "Correo válido" });
-
   } catch (error) {
     console.error("🔥 ERROR REAL:", error);
     res.status(500).json({ mensaje: "Error en servidor" });
@@ -156,6 +123,7 @@ app.post("/resetPassword", async (req, res) => {
   }
 });
 
+
 // Asegurar que la tabla `libros` exista (previene ER_NO_SUCH_TABLE)
 const createLibrosTable = `
 CREATE TABLE IF NOT EXISTS libros (
@@ -172,8 +140,6 @@ CREATE TABLE IF NOT EXISTS libros (
 
 // Crear la tabla si no existe
 db.promise().query(createLibrosTable)
-  // .then(() => console.log('✅ Tabla `libros` verificada/creada'))
-  // .catch(err => console.error('Error creando/verificando tabla libros:', err));
 
 // Crear tabla `usuario` si no existe (útil en entornos de desarrollo)
 const createUsuarioTable = `
@@ -194,12 +160,8 @@ db.promise().query(createUsuarioTable)
   // .then(() => console.log('✅ Tabla `usuario` verificada/creada'))
   .catch(err => console.error('Error creando/verificando tabla usuario:', err));
 
-// Si la tabla ya existía con la columna `image` corta, intentar modificarla a MEDIUMTEXT.
-// Esto permite almacenar data URLs/base64 largos sin fallar con ER_DATA_TOO_LONG.
 db.promise().query("ALTER TABLE libros MODIFY COLUMN image MEDIUMTEXT")
-  // .then(() => console.log('✅ Columna `image` en `libros` asegurada como MEDIUMTEXT'))
   .catch(err => {
-    // Ignorar errores comunes (por ejemplo si la tabla no existe aún o la columna ya tiene el tipo correcto)
     if (err && err.code !== 'ER_NO_SUCH_TABLE' && err.errno !== 1146) {
       console.error('Error al alterar la columna image en libros:', err);
     }
@@ -719,7 +681,6 @@ app.get('/perfil', (req, res) => {
 });
 
 // Asegurar columna avatar en tabla usuario (MEDIUMTEXT) para poder guardar dataURLs si fuese necesario
-// Verificar si la columna `avatar` existe en la tabla `usuario`. Si no existe, crearla como MEDIUMTEXT.
 db.promise().query("SHOW COLUMNS FROM usuario LIKE 'avatar'")
   .then(([rows]) => {
     if (!rows || rows.length === 0) {
@@ -796,7 +757,6 @@ app.put('/perfil', async (req, res) => {
 });
 
 // Endpoint para cambiar credenciales desde el área de administración/front-end
-// Verifica la sesión y la contraseña actual antes de aplicar el cambio.
 app.put('/admin/credenciales', async (req, res) => {
   try {
     const id_usuario = req.session.id_usuario;
@@ -1267,10 +1227,11 @@ app.put("/carrito/finalizar", async (req, res) => {
   }
 });
 
+
+
 // Obtener todos los pedidos (ruta para administradores)
 app.get('/pedidos', async (req, res) => {
   try {
-    // Traer pedidos junto al nombre del usuario (cliente) para la vista de admin
     const [rows] = await db.promise().query(
       `SELECT p.id_pedido, p.id_usuario, p.total, p.estado, p.fecha_creacion, p.libros, u.nombre AS nombre_cliente, u.correo AS correo_cliente
        FROM pedidos p
@@ -1294,17 +1255,38 @@ app.get('/pedidos', async (req, res) => {
 });
 
 
-// ==== RUTAS PARA LIBROS DESTACADOS ====
-// Tabla sugerida en MySQL:
-// CREATE TABLE featured_books (
-//   id INT AUTO_INCREMENT PRIMARY KEY,
-//   title VARCHAR(255) NOT NULL,
-//   author VARCHAR(255),
-//   price DECIMAL(10,2) DEFAULT 0,
-//   image VARCHAR(512),
-//   description TEXT,
-//   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-// );
+
+// GET pedido individual por ID
+app.get('/pedidos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await db.promise().query(
+      `SELECT p.id_pedido, p.id_usuario, p.total, p.estado, p.fecha_creacion, p.libros,
+              u.nombre AS nombre_cliente, u.correo AS correo_cliente
+       FROM pedidos p
+       LEFT JOIN usuario u ON p.id_usuario = u.id_usuario
+       WHERE p.id_pedido = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
+    }
+
+    const pedido = {
+      ...rows[0],
+      libros: typeof rows[0].libros === 'string' ? JSON.parse(rows[0].libros) : rows[0].libros
+    };
+
+    res.json({ success: true, pedido });
+
+  } catch (err) {
+    console.error('Error al obtener pedido:', err);
+    res.status(500).json({ success: false, message: 'Error al obtener pedido' });
+  }
+});
+
 
 // Obtener libros destacados
 app.get('/libros', async (req, res) => {
@@ -1497,9 +1479,6 @@ app.put('/libros/:id', async (req, res) => {
 
 
 
-
-
-
 //  Obtener pedidos del usuario en sesión
 app.get("/mis-pedidos", async (req, res) => {
   const id_usuario = req.session.id_usuario;
@@ -1531,8 +1510,6 @@ app.get("/mis-pedidos", async (req, res) => {
     res.status(500).json({ success: false, message: "Error al obtener pedidos" });
   }
 });
-
-
 
 
 // ====RUTAS DE ADMINISTRADOR====
@@ -1641,7 +1618,6 @@ app.patch('/usuario/:id', async (req, res) => {
 });
 
 
-  
 
 // Página de bienvenida
 app.get('/bienvenido', (req, res) => {
@@ -1811,4 +1787,318 @@ app.use((err, req, res, next) => {
     }
   }
   next(err);
+});
+
+
+
+// ======Enpoind de cuenta bancaria====
+app.post("/cuenta-bancaria", async (req, res) => {
+  try {
+    const { banco, titular, clabe, tipo } = req.body;
+
+    // Obtener usuario desde sesión
+const usuario_id = req.session.id_usuario;
+    if (!usuario_id) {
+      return res.status(401).json({
+        success: false,
+        message: "Usuario no autenticado"
+      });
+    }
+
+    // Validaciones básicas
+    if (!banco || !titular || !clabe || !tipo) {
+      return res.json({
+        success: false,
+        message: "Faltan datos"
+      });
+    }
+
+    if (clabe.length !== 18) {
+      return res.json({
+        success: false,
+        message: "La CLABE debe tener 18 dígitos"
+      });
+    }
+
+    // Insertar en BD
+    await db.promise().query(
+      `INSERT INTO cuentas_bancarias 
+       (usuario_id, banco, titular, clabe, tipo) 
+       VALUES (?, ?, ?, ?, ?)`,
+      [usuario_id, banco, titular, clabe, tipo]
+    );
+
+    res.json({
+      success: true,
+      message: "Cuenta guardada correctamente"
+    });
+
+  } catch (error) {
+    console.error("🔥 ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error en el servidor"
+    });
+  }
+});
+
+// trae los datos bancarios 
+app.get("/cuenta-bancaria", async (req, res) => {
+  try {
+    const usuario_id = req.session.userId || req.session.id_usuario;
+
+    if (!usuario_id) {
+      return res.status(401).json({ success: false, message: "No autenticado" });
+    }
+
+    const [rows] = await db.promise().query(
+      "SELECT * FROM cuentas_bancarias WHERE usuario_id = ?",
+      [usuario_id]
+    );
+
+    res.json({ success: true, cuenta: rows[0] || null });
+
+  } catch (error) {
+    console.error(error);
+    res.json({ success: false });
+  }
+});
+
+
+// ELIMINAR LA CEUNTA ABNCARIA
+app.delete("/cuenta-bancaria", async (req, res) => {
+  try {
+    const usuario_id = req.session.id_usuario;
+
+    if (!usuario_id) {
+      return res.status(401).json({
+        success: false,
+        message: "No autenticado"
+      });
+    }
+
+    await db.promise().query(
+      "DELETE FROM cuentas_bancarias WHERE usuario_id = ?",
+      [usuario_id]
+    );
+
+    res.json({
+      success: true,
+      message: "Cuenta eliminada"
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Error en servidor"
+    });
+  }
+});
+
+
+
+// PUT actualizar estado del pedidoñ
+app.put("/pedidos/:id/estado", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estado } = req.body;
+
+        const estadosValidos = ['pendiente', 'procesando', 'enviado', 'entregado', 'cancelado'];
+        if (!estadosValidos.includes(estado)) {
+            return res.status(400).json({ success: false, message: "Estado inválido" });
+        }
+
+        await db.promise().query(
+            "UPDATE pedidos SET estado = ? WHERE id_pedido = ?",
+            [estado, id]
+        );
+
+        res.json({ success: true, message: "Estado actualizado" });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: "Error al actualizar estado" });
+    }
+});
+
+
+
+// RUTA PARA DESCRGAR EN PDF LOS PEDIDOS
+app.get('/mis-pedidos/:id/factura', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const usuario_id = req.session.id_usuario;
+
+    // Traer el pedido de la BD
+    const [rows] = await db.promise().query(
+      `SELECT p.id_pedido, p.total, p.estado, p.fecha_creacion, p.libros,
+              u.nombre AS nombre_cliente, u.correo AS correo_cliente
+       FROM pedidos p
+       LEFT JOIN usuario u ON p.id_usuario = u.id_usuario
+       WHERE p.id_pedido = ? AND p.id_usuario = ?`,
+      [id, usuario_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Pedido no encontrado' });
+    }
+
+    const pedido = rows[0];
+    const libros = typeof pedido.libros === 'string'
+      ? JSON.parse(pedido.libros)
+      : pedido.libros;
+
+    // Crear el PDF
+    const doc = new PDFDocument({ margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=factura-pedido-${id}.pdf`);
+    doc.pipe(res);
+
+    // ===== ENCABEZADO =====
+    doc.fontSize(20).font('Helvetica-Bold').text('Tienda de Libros', { align: 'center' });
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('#6B21A8').text('BookVerse', { align: 'center' });
+    doc.fontSize(12).font('Helvetica').fillColor('#000000').text('Factura de compra', { align: 'center' });    doc.moveDown();
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown();
+
+    // ===== DATOS DEL PEDIDO =====
+    doc.fontSize(12).font('Helvetica-Bold').text('Datos del pedido');
+    doc.font('Helvetica');
+    doc.text(`Pedido #:     ${pedido.id_pedido}`);
+    doc.text(`Cliente:      ${pedido.nombre_cliente || 'N/A'}`);
+    doc.text(`Correo:       ${pedido.correo_cliente || 'N/A'}`);
+    doc.text(`Fecha:        ${new Date(pedido.fecha_creacion).toLocaleDateString()}`);
+    doc.moveDown();
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown();
+
+    // ===== TABLA DE LIBROS =====
+    doc.font('Helvetica-Bold');
+    doc.text('Título',          50,  doc.y, { width: 250 });
+    doc.text('Cantidad',        300, doc.y - doc.currentLineHeight(), { width: 80,  align: 'center' });
+    doc.text('Precio unit.',    380, doc.y - doc.currentLineHeight(), { width: 80,  align: 'right' });
+    doc.text('Subtotal',        460, doc.y - doc.currentLineHeight(), { width: 80,  align: 'right' });
+    doc.moveDown(0.5);
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    doc.font('Helvetica');
+    libros.forEach(libro => {
+      const precio    = Number(libro.precio_unitario || 0);
+      const cantidad  = Number(libro.cantidad || 1);
+      const subtotal  = precio * cantidad;
+      const y         = doc.y;
+
+      doc.text(libro.titulo || 'Sin título', 50,  y, { width: 250 });
+      doc.text(String(cantidad),             300, y, { width: 80,  align: 'center' });
+      doc.text(`$${precio.toFixed(2)}`,      380, y, { width: 80,  align: 'right' });
+      doc.text(`$${subtotal.toFixed(2)}`,    460, y, { width: 80,  align: 'right' });
+      doc.moveDown();
+    });
+
+    doc.moveDown(0.5);
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown();
+
+    // ===== TOTAL =====
+    doc.font('Helvetica-Bold').fontSize(13);
+    doc.text(`Total:  $${Number(pedido.total).toFixed(2)}`, { align: 'right' });
+
+    doc.end();
+
+  } catch (err) {
+    console.error('Error generando factura:', err);
+    res.status(500).json({ message: 'Error generando factura' });
+  }
+});
+
+
+// ruta de descarga pdf del
+app.get('/admin/pedidos/:id/factura', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [rows] = await db.promise().query(
+      `SELECT p.id_pedido, p.total, p.estado, p.fecha_creacion, p.libros,
+              u.nombre AS nombre_cliente, u.correo AS correo_cliente
+       FROM pedidos p
+       LEFT JOIN usuario u ON p.id_usuario = u.id_usuario
+       WHERE p.id_pedido = ?`,
+      [id]  // 👈 sin restricción de id_usuario
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Pedido no encontrado' });
+    }
+
+    const pedido = rows[0];
+    const libros = typeof pedido.libros === 'string'
+      ? JSON.parse(pedido.libros)
+      : pedido.libros;
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=factura-pedido-${id}.pdf`);
+    doc.pipe(res);
+
+    // ENCABEZADO
+    doc.fontSize(20).font('Helvetica-Bold').text('Tienda de Libros', { align: 'center' });
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('#6B21A8').text('BookVerse', { align: 'center' });
+    doc.fontSize(12).font('Helvetica').fillColor('#000000').text('Factura de compra', { align: 'center' });
+    doc.moveDown();
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown();
+
+    // DATOS DEL PEDIDO
+    doc.fontSize(12).font('Helvetica-Bold').text('Datos del pedido');
+    doc.font('Helvetica');
+    doc.text(`Pedido #:     ${pedido.id_pedido}`);
+    doc.text(`Cliente:      ${pedido.nombre_cliente || 'N/A'}`);
+    doc.text(`Correo:       ${pedido.correo_cliente || 'N/A'}`);
+    doc.text(`Fecha:        ${new Date(pedido.fecha_creacion).toLocaleDateString()}`);
+    doc.moveDown();
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown();
+
+    // TABLA DE LIBROS
+    doc.font('Helvetica-Bold');
+    doc.text('Título',       50,  doc.y, { width: 250 });
+    doc.text('Cantidad',     300, doc.y - doc.currentLineHeight(), { width: 80,  align: 'center' });
+    doc.text('Precio unit.', 380, doc.y - doc.currentLineHeight(), { width: 80,  align: 'right' });
+    doc.text('Subtotal',     460, doc.y - doc.currentLineHeight(), { width: 80,  align: 'right' });
+    doc.moveDown(0.5);
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    doc.font('Helvetica');
+    libros.forEach(libro => {
+      const precio   = Number(libro.precio_unitario || 0);
+      const cantidad = Number(libro.cantidad || 1);
+      const subtotal = precio * cantidad;
+      const y        = doc.y;
+
+      doc.text(libro.titulo || 'Sin título', 50,  y, { width: 250 });
+      doc.text(String(cantidad),             300, y, { width: 80,  align: 'center' });
+      doc.text(`$${precio.toFixed(2)}`,      380, y, { width: 80,  align: 'right' });
+      doc.text(`$${subtotal.toFixed(2)}`,    460, y, { width: 80,  align: 'right' });
+      doc.moveDown();
+    });
+
+    doc.moveDown(0.5);
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown();
+
+    doc.font('Helvetica-Bold').fontSize(13);
+    doc.text(`Total:  $${Number(pedido.total).toFixed(2)}`, { align: 'right' });
+
+    doc.end();
+
+  } catch (err) {
+    console.error('Error generando factura admin:', err);
+    res.status(500).json({ message: 'Error generando factura' });
+  }
 });

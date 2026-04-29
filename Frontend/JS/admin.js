@@ -625,27 +625,111 @@ function initSidebar() {
   });
 }
 
+
+// es funcional carga los pediod ======
+
+// async function loadOrders() {
+//   await cargarPedidosAdmin();
+//   try {
+//     const res = await fetch('/pedidos', { method: 'GET' });
+//     const data = await res.json();
+
+//     if (!data || !data.success) {
+//       console.error('Error cargando pedidos', data);
+//       document.getElementById('ordersTable').innerHTML = '<tr><td colspan="5">No se pudieron cargar los pedidos</td></tr>';
+//       return;
+//     }
+
+//     renderOrders(data.pedidos || []);
+//     // actualizar contadores simples
+//     document.getElementById('totalOrders').textContent = (data.pedidos || []).length;
+//     const revenue = (data.pedidos || []).reduce((sum, p) => sum + Number(p.total || 0), 0);
+//     document.getElementById('totalRevenue').textContent = `$${revenue.toFixed(2)}`;
+//   } catch (err) {
+//     console.error('Error en loadOrders:', err);
+//     document.getElementById('ordersTable').innerHTML = '<tr><td colspan="5">Error al cargar pedidos</td></tr>';
+//   }
+// }
+
+
 async function loadOrders() {
   try {
     const res = await fetch('/pedidos', { method: 'GET' });
     const data = await res.json();
 
+    const tbody = document.getElementById('ordersTable');
+    if (!tbody) return;
+
     if (!data || !data.success) {
       console.error('Error cargando pedidos', data);
-      document.getElementById('ordersTable').innerHTML = '<tr><td colspan="5">No se pudieron cargar los pedidos</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">No se pudieron cargar los pedidos</td></tr>';
       return;
     }
 
-    renderOrders(data.pedidos || []);
-    // actualizar contadores simples
-    document.getElementById('totalOrders').textContent = (data.pedidos || []).length;
-    const revenue = (data.pedidos || []).reduce((sum, p) => sum + Number(p.total || 0), 0);
-    document.getElementById('totalRevenue').textContent = `$${revenue.toFixed(2)}`;
+    const pedidos = data.pedidos || [];
+
+    if (pedidos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#999;">No hay pedidos</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+
+    pedidos.forEach(p => {
+      const estadoActual = p.estado || 'pendiente';
+      const tr = document.createElement('tr');
+
+      tr.innerHTML = `
+        <td>${p.id_pedido}</td>
+        <td>${escapeHtml(p.nombre_cliente || 'Cliente')}<br>
+            <small style="color:#999">${escapeHtml(p.correo_cliente || '')}</small></td>
+        <td>${new Date(p.fecha_creacion).toLocaleString()}</td>
+        <td>$${Number(p.total || 0).toFixed(2)}</td>
+        <td>
+          <select class="order-status-select" data-order-id="${p.id_pedido}">
+            <option value="pendiente"  ${estadoActual === 'pendiente'  ? 'selected' : ''}> Pendiente</option>
+            <option value="procesando" ${estadoActual === 'procesando' ? 'selected' : ''}> Procesando</option>
+            <option value="enviado"    ${estadoActual === 'enviado'    ? 'selected' : ''}> Enviado</option>
+            <option value="entregado"  ${estadoActual === 'entregado'  ? 'selected' : ''}> Entregado</option>
+          </select>
+        </td>
+        <td>
+         <div class="action-buttons">
+              <button class="btn-secondary btn-ver-pedido" onclick="showOrderDetails(${p.id_pedido})">Ver</button>
+              <button class="btn-primary" onclick="descargarFacturaAdmin(${p.id_pedido})"> 📄 Factura</button>
+         </div>
+</td>
+
+       
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+    // actualizar contadores
+    const totalEl = document.getElementById('totalOrders');
+    const revenueEl = document.getElementById('totalRevenue');
+    if (totalEl) totalEl.textContent = pedidos.length;
+    if (revenueEl) {
+      const revenue = pedidos.reduce((sum, p) => sum + Number(p.total || 0), 0);
+      revenueEl.textContent = `$${revenue.toFixed(2)}`;
+    }
+
   } catch (err) {
     console.error('Error en loadOrders:', err);
-    document.getElementById('ordersTable').innerHTML = '<tr><td colspan="5">Error al cargar pedidos</td></tr>';
+    const tbody = document.getElementById('ordersTable');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6">Error al cargar pedidos</td></tr>';
   }
 }
+
+// DESCARGA UN PDF DAOS DEL PEDIDO
+function descargarFacturaAdmin(idPedido) {
+  const a = document.createElement('a');
+  a.href = `/admin/pedidos/${idPedido}/factura`;  // 👈 nueva ruta
+  a.download = `factura-pedido-${idPedido}.pdf`;
+  a.click();
+}
+
 
 // Filtrar pedidos por rango de fecha: 'today' | 'week' | 'custom' (start/end ISO dates)
 async function applyOrderDateFilter() {
@@ -1067,6 +1151,8 @@ async function showOrderDetails(orderOrId) {
     console.error('Error al abrir modal:', err);
   }
 }
+
+
 
 function closeOrderDetailsModal() {
   const modal = document.getElementById('orderDetailsModal');
@@ -2516,3 +2602,35 @@ window.toggleUserActive = toggleUserActive;
 document.addEventListener('DOMContentLoaded', () => {
   try { initInventoryTabs(); } catch (e) { /* ignore */ }
 });
+
+
+
+// CAMBIAR EL ESATDO DE UN PEDIDO 
+document.addEventListener("change", async (e) => {
+    if (e.target.classList.contains("order-status-select")) {
+        const idPedido = e.target.dataset.orderId;
+        const nuevoEstado = e.target.value;
+        await actualizarEstadoPedido(idPedido, nuevoEstado);
+    }
+});
+
+async function actualizarEstadoPedido(idPedido, nuevoEstado) {
+    try {
+        const res = await fetch(`/pedidos/${idPedido}/estado`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ estado: nuevoEstado })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            showToast("Estado actualizado ✓", "success");
+        } else {
+            showToast("Error: " + data.message, "error");
+        }
+    } catch (err) {
+        console.error("Error actualizando estado:", err);
+        showToast("Error de conexión", "error");
+    }
+}
