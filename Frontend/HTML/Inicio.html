@@ -67,7 +67,9 @@
     <div id="sidebar-profile" class="sidebar-profile"></div>
     <div class="sidebar-menu">
         <button class="sidebar-tab active" onclick="showSection('cart')"> <i class="fas fa-shopping-cart"></i> Carrito (<span id="sidebar-cart-count">0</span>)</button>
-        <button class="sidebar-tab" onclick="logout()"> <i class="fas fa-sign-out-alt"></i> Salir</button>
+        <button class="account-btn logout-btn" onclick="logout()"> <i class="fas fa-sign-out-alt"></i> Salir</button>
+ 
+    
     </div>
     <div class="sidebar-content">
         <div id="cart-section" class="section active">
@@ -125,7 +127,7 @@
     <!-- Books Section removed: books render in main results area -->
 
     <!-- Cart Sidebar -->
-    <div class="cart-sidebar" id="cart-sidebar">
+    <!-- <div class="cart-sidebar" id="cart-sidebar">
         <div class="cart-header">
             <h3>Mi Carrito</h3>
             <button class="close-cart" onclick="toggleCart()">×</button>
@@ -137,33 +139,34 @@
             Total: $0
         </div>
         <button class="checkout-btn" onclick="checkout()">Proceder al Pago</button>
-    </div>
+    </div> -->
 
     <!-- Overlay -->
+
     <div class="overlay" id="overlay" onclick="toggleCart()"></div>
 
     <!-- Notification -->
-    <div class="notification" id="notification">
+    <!-- <div class="notification" id="notification">
         ¡Libro agregado al carrito!
-    </div>
+    </div> -->
 
    
 
     <div id="toast-container"></div>
 
     <!-- Logout Confirmation Modal -->
-    <div id="logout-modal" class="modal" style="display:none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-sign-out-alt"></i> Cerrar sesión</h3>
-                <span class="close" id="logout-modal-close">&times;</span>
+
+    <div id="logout-modal" class="modal" >
+        <div class="logout-modal-content">
+            <span class="close" id="logout-modal-close">&times;</span>
+            <div class="logout-modal-icon">
+                <i class="fas fa-sign-out-alt"></i>
             </div>
-            <div class="modal-body">
-                <p>¿Estás seguro de que quieres cerrar sesión?</p>
-            </div>
-            <div class="modal-footer" style="display:flex; gap:8px; justify-content:flex-end;">
-                <button class="btn-secondary" onclick="cancelLogout()">Cancelar</button>
-                <button class="btn-danger" onclick="confirmLogout()">Cerrar sesión</button>
+            <div class="logout-modal-title">Cerrar sesión</div>
+            <div class="logout-modal-body">¿Estás seguro de que quieres cerrar sesión?</div>
+            <div class="logout-modal-footer">
+                <button class="logout-cancel-btn" onclick="cancelLogout()">Cancelar</button>
+                <button class="logout-confirm-btn" onclick="confirmLogout()">Cerrar sesión</button>
             </div>
         </div>
     </div>
