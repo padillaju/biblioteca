@@ -626,31 +626,6 @@ function initSidebar() {
 }
 
 
-// es funcional carga los pediod ======
-
-// async function loadOrders() {
-//   await cargarPedidosAdmin();
-//   try {
-//     const res = await fetch('/pedidos', { method: 'GET' });
-//     const data = await res.json();
-
-//     if (!data || !data.success) {
-//       console.error('Error cargando pedidos', data);
-//       document.getElementById('ordersTable').innerHTML = '<tr><td colspan="5">No se pudieron cargar los pedidos</td></tr>';
-//       return;
-//     }
-
-//     renderOrders(data.pedidos || []);
-//     // actualizar contadores simples
-//     document.getElementById('totalOrders').textContent = (data.pedidos || []).length;
-//     const revenue = (data.pedidos || []).reduce((sum, p) => sum + Number(p.total || 0), 0);
-//     document.getElementById('totalRevenue').textContent = `$${revenue.toFixed(2)}`;
-//   } catch (err) {
-//     console.error('Error en loadOrders:', err);
-//     document.getElementById('ordersTable').innerHTML = '<tr><td colspan="5">Error al cargar pedidos</td></tr>';
-//   }
-// }
-
 
 async function loadOrders() {
   try {

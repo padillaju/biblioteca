@@ -63,8 +63,6 @@ db.getConnection((err, connection) => {
 });
 
 
-
-
 // crear la nueva contraseña 
 
 app.post("/recuperarPass", async (req, res) => {
@@ -90,8 +88,6 @@ app.post("/recuperarPass", async (req, res) => {
     res.status(500).json({ mensaje: "Error en servidor" });
   }
 });
-
-
 
 
 app.post("/resetPassword", async (req, res) => {
@@ -157,7 +153,6 @@ CREATE TABLE IF NOT EXISTS usuario (
 `;
 
 db.promise().query(createUsuarioTable)
-  // .then(() => console.log('✅ Tabla `usuario` verificada/creada'))
   .catch(err => console.error('Error creando/verificando tabla usuario:', err));
 
 db.promise().query("ALTER TABLE libros MODIFY COLUMN image MEDIUMTEXT")
@@ -838,7 +833,7 @@ CREATE TABLE IF NOT EXISTS proveedores (
 `;
 
 db.promise().query(createProveedoresTable)
-  .then(() => console.log('✅ Tabla `proveedores` verificada/creada'))
+  // .then(() => console.log('✅ Tabla `proveedores` verificada/creada'))
   .catch(err => console.error('Error creando/verificando tabla proveedores:', err));
 
 // Asegurar columnas esperadas en `proveedores` (si la tabla venía de otro esquema)
@@ -888,11 +883,11 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
 `;
 
 db.promise().query(createPurchaseOrdersTable)
-  .then(() => console.log('✅ Tabla `purchase_orders` verificada/creada'))
+  // .then(() => console.log('✅ Tabla `purchase_orders` verificada/creada'))
   .catch(err => console.error('Error creando/verificando tabla purchase_orders:', err));
 
 db.promise().query(createPurchaseItemsTable)
-  .then(() => console.log('✅ Tabla `purchase_order_items` verificada/creada'))
+  // .then(() => console.log('✅ Tabla `purchase_order_items` verificada/creada'))
   .catch(err => console.error('Error creando/verificando tabla purchase_order_items:', err));
 
 
@@ -1025,6 +1020,63 @@ app.post('/carrito/actualizar', async (req, res) => {
 });
 
 
+// elminar /Vaciar carrito completo
+app.delete('/carrito/limpiar', async (req, res) => {
+  try {
+    const id_usuario = req.session.id_usuario;
+
+    if (!id_usuario) {
+      return res.status(401).json({ success: false, message: 'No autenticado' });
+    }
+
+    const [carritoRows] = await db.promise().query(
+      "SELECT id_carrito FROM carrito WHERE id_usuario = ? AND estado = 'activo'",
+      [id_usuario]
+    );
+
+    if (carritoRows.length === 0) {
+      return res.json({ success: true, message: 'Carrito ya estaba vacío' });
+    }
+
+    const id_carrito = carritoRows[0].id_carrito;
+
+    await db.promise().query(
+      "DELETE FROM carrito_items WHERE id_carrito = ?",
+      [id_carrito]
+    );
+
+    res.json({ success: true, message: 'Carrito vaciado correctamente' });
+
+  } catch (err) {
+    console.error('Error al vaciar carrito:', err);
+    res.status(500).json({ success: false, message: 'Error al vaciar carrito' });
+  }
+});
+
+
+
+// borrar favoritos
+app.delete('/favoritos/limpiar', async (req, res) => {
+  try {
+    const id_usuario = req.session.id_usuario;
+
+    if (!id_usuario) {
+      return res.status(401).json({ success: false, message: 'No autenticado' });
+    }
+
+    await db.promise().query(
+      "DELETE FROM favoritos WHERE id_usuario = ?",
+      [id_usuario]
+    );
+
+    res.json({ success: true, message: 'Favoritos eliminados' });
+
+  } catch (err) {
+    console.error('Error al limpiar favoritos:', err);
+    res.status(500).json({ success: false, message: 'Error al limpiar favoritos' });
+  }
+});
+
 
 // eliminar libro del carrito
 app.delete('/carrito/:libro_id_api', async (req, res) => {
@@ -1062,7 +1114,6 @@ app.delete('/carrito/:libro_id_api', async (req, res) => {
 });
 
 
-// POST /pedidos  -> crea un pedido a partir del carrito activo del usuario
 // POST /pedidos  -> crea un pedido a partir del carrito activo del usuario
 app.post("/pedidos", async (req, res) => {
   console.log("Usuario en sesión:", req.session.id_usuario);

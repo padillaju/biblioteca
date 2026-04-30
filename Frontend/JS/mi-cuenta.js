@@ -1603,7 +1603,6 @@ function generarFacturaPedido(idPedido) {
 // ========= FAVORITES FUNCTIONALITY =====
 
 function saveBook(bookId) {
-  // Compatibilidad: usar getFavorites/saveFavorites para mantener formato unificado
   try {
     let favorites = getFavorites() || []
     if (favorites.some(f => String(f.id) === String(bookId))) {
@@ -1694,39 +1693,19 @@ function updateFavoritesCount() {
     favoritesStat.textContent = favorites.length;
   }
 }
+
+
+// quitar favortiso
 function clearFavorites() {
-  // Eliminamos sin confirmación (petición del usuario)
-  try {
-    localStorage.removeItem('favorites')
-  } catch (e) { /* ignore */ }
-  try { if (typeof loadFavorites === 'function') loadFavorites() } catch (e) { /* ignore */ }
-  try { showNotification('Favoritos limpiados', 'info') } catch (e) { console.log('Favoritos limpiados') }
+  confirmWithToast('¿Estás seguro de limpiar tus favoritos?', () => {
+    try { localStorage.removeItem('bookFavorites') } catch (e) { }
+    try { localStorage.removeItem('favorites') } catch (e) { }
+    renderFavorites();
+    try { showNotification('Favoritos limpiados', 'info') } catch (e) { }
+  }, () => {
+    try { showNotification('Acción cancelada', 'info') } catch (e) { }
+  });
 }
-
-function saveBook(id, title, author, price, imageUrl) {
-  const favorites = getFavorites();
-
-  // Evitar duplicados
-  if (favorites.some(book => book.id === id)) {
-    try { showToast("📘 Este libro ya está en tus favoritos", 'info') } catch (e) { alert("📘 Este libro ya está en tus favoritos") }
-    return;
-  }
-
-  favorites.push({ id, title, author, price, imageUrl });
-  saveFavorites(favorites);
-  renderFavorites();
-  try { showToast("❤️ Libro añadido a favoritos", 'success') } catch (e) { alert("❤️ Libro añadido a favoritos") }
-}
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1796,6 +1775,7 @@ function getFavorites() {
   return out
 }
 
+
 function saveFavorites(favorites) {
   try {
     localStorage.setItem("bookFavorites", JSON.stringify(favorites))
@@ -1809,42 +1789,32 @@ function saveFavorites(favorites) {
 
 
 async function addToCartFromFavorites(bookId, title, authors, price, imageUrl) {
-  const parsedPrice = parseNumberString(price)
+  console.log('1. Iniciando', { bookId, title, price });
+  const parsedPrice = parseNumberString(price);
+  console.log('2. parsedPrice:', parsedPrice);
 
-  // Comprobar primero si ya está en el carrito en el servidor
   try {
-    console.debug('[addToCartFromFavorites] payload:', { libro_id_api: bookId, titulo: title, precio_unitario: parsedPrice })
-    const checkRes = await fetch('http://localhost:3000/carrito', { credentials: 'include' })
-    const checkData = await checkRes.json().catch(() => ({ success: false }))
-    console.debug('[addToCartFromFavorites] server check response:', checkData)
+    console.log('3. Verificando carrito servidor...');
+    const checkRes = await fetch('/carrito', { credentials: 'include' });
+    console.log('4. Respuesta carrito status:', checkRes.status);
+    const checkData = await checkRes.json().catch(() => ({ success: false }));
+    console.log('5. checkData:', checkData);
+
     if (checkData && checkData.success && Array.isArray(checkData.items)) {
-      const exists = checkData.items.some(it => String(it.libro_id_api || it.id) === String(bookId))
+      const exists = checkData.items.some(it => String(it.libro_id_api || it.id) === String(bookId));
+      console.log('6. existe en carrito:', exists);
       if (exists) {
-        try { showNotification(`"${title}" ya está en el carrito`, 'error') } catch (e) { /* ignore */ }
-        return
+        showNotification(`"${title}" ya está en el carrito`, 'error');
+        return;
       }
     }
   } catch (e) {
-    // ignore and fallback to local check below
+    console.log('7. ERROR verificando carrito:', e);
   }
 
-  // Comprobar carrito local como fallback
   try {
-    const raw = localStorage.getItem('bookCart')
-    const cartLocal = raw ? JSON.parse(raw) : []
-    console.debug('[addToCartFromFavorites] local cart before add check:', cartLocal)
-    const existsLocal = cartLocal.some(it => String(it.id) === String(bookId) || String(it.libro_id_api) === String(bookId))
-    if (existsLocal) {
-      try { showNotification(`"${title}" ya está en el carrito`, 'error') } catch (e) { /* ignore */ }
-      return
-    }
-  } catch (e) {
-    // ignore parse errors
-  }
-
-  // Intentar agregar en el servidor
-  try {
-    const resp = await fetch('http://localhost:3000/carrito/agregar', {
+    console.log('8. Agregando al servidor...');
+    const resp = await fetch('/carrito/agregar', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -1855,45 +1825,45 @@ async function addToCartFromFavorites(bookId, title, authors, price, imageUrl) {
         precio_unitario: parsedPrice,
         imagen: imageUrl
       })
-    })
-    const data = await resp.json().catch(() => ({ success: false }))
+    });
+    console.log('9. Respuesta agregar status:', resp.status);
+    const data = await resp.json().catch(() => ({ success: false }));
+    console.log('10. data:', data);
+
     if (data && data.success) {
-      showNotification(`"${title}" añadido al carrito`, 'success')
-      if (typeof loadCart === 'function') { try { loadCart() } catch (e) { /* ignore */ } }
-      try { updateAllCounts() } catch (e) { /* ignore */ }
-      return
+      console.log('11. Éxito');
+      showNotification(`"${title}" añadido al carrito`, 'success');
+      if (typeof loadCart === 'function') loadCart();
+      updateAllCounts();
+      return;
     }
+    console.log('12. servidor respondió pero sin success:', data);
   } catch (err) {
-    console.warn('Error agregando al carrito en el servidor, usando localStorage:', err)
+    console.log('13. ERROR agregando al servidor:', err);
   }
 
-  // Fallback local
+  console.log('14. Cayendo a fallback local...');
   try {
-    const cart = getCart()
-    const existingIndex = cart.findIndex((book) => String(book.id) === String(bookId) || String(book.libro_id_api) === String(bookId))
+    const cart = getCart();
+    const existingIndex = cart.findIndex(book =>
+      String(book.id) === String(bookId) || String(book.libro_id_api) === String(bookId)
+    );
     if (existingIndex !== -1) {
-      try { showNotification('Este libro ya está en el carrito', 'error') } catch (e) { /* ignore */ }
-      return
+      showNotification('Este libro ya está en el carrito', 'error');
+      return;
     }
-
-    const newBook = {
-      id: bookId,
-      title,
-      author: authors,
-      price: parsedPrice,
-      image: imageUrl,
-      quantity: 1,
-    }
-
-    cart.push(newBook)
-    saveCart(cart)
-    showNotification(`"${title}" añadido al carrito`, 'success')
-    try { updateAllCounts() } catch (e) { /* ignore */ }
+    cart.push({ id: bookId, title, author: authors, price: parsedPrice, image: imageUrl, quantity: 1 });
+    saveCart(cart);
+    console.log('15. Guardado en local, mostrando notificación');
+    showNotification(`"${title}" añadido al carrito`, 'success');
+    updateAllCounts();
   } catch (e) {
-    console.error('Error al agregar favorito al carrito (fallback):', e)
-    try { showNotification('No se pudo agregar el libro al carrito', 'warning') } catch (e) { /* ignore */ }
+    console.log('16. ERROR en fallback:', e);
+    showNotification('No se pudo agregar el libro al carrito', 'warning');
   }
 }
+
+
 
 // Quitar favorito por índice
 function removeFromFavorites(index) {
